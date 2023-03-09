@@ -19,6 +19,7 @@ defmodule Naive.Trader do
 
   # API
   def send_event(%TradeEvent{} = event) do
+    # what is the meaning of :trader atom here?
     GenServer.cast(:trader, event)
   end
 
@@ -98,6 +99,7 @@ defmodule Naive.Trader do
         } = state
       ) do
     Logger.info("Trade finished, trader will now exit")
+    # a tuple with :stop atom which will cause the trader process to terminate.
     {:stop, :normal, state}
   end
 
