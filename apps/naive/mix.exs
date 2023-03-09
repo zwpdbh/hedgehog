@@ -1,9 +1,9 @@
-defmodule Streamer.MixProject do
+defmodule Naive.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :streamer,
+      app: :naive,
       version: "0.1.0",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
@@ -19,7 +19,7 @@ defmodule Streamer.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {Streamer.Application, []}
+      mod: {Naive.Application, []}
     ]
   end
 
@@ -29,8 +29,10 @@ defmodule Streamer.MixProject do
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"},
       # {:sibling_app_in_umbrella, in_umbrella: true}
-      {:websockex, "~> 0.4.3"},
-      {:poison, "~> 4.0"}
+
+      {:binance, "~> 1.0"},
+      {:decimal, "~> 2.0"},
+      {:streamer, in_umbrella: true}
     ]
   end
 end
