@@ -17,12 +17,6 @@ defmodule Naive.Trader do
     ]
   end
 
-  # API
-  def send_event(%TradeEvent{} = event) do
-    # what is the meaning of :trader atom here?
-    GenServer.cast(:trader, event)
-  end
-
   def start_link(%{} = args) do
     GenServer.start_link(__MODULE__, args)
   end
