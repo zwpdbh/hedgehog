@@ -45,7 +45,13 @@ defmodule Naive.Trader do
     |> Map.get("tickSize")
   end
 
-  def handle_cast(%TradeEvent{price: price}, %State{symbol: symbol, buy_order: nil} = state) do
+  def handle_cast(
+    %TradeEvent{
+      price: price},
+    %State{
+      symbol: symbol,
+      buy_order: nil} = state)
+      do
     quantity = 100
     Logger.info("Placing Buy order for #{symbol} @#{price}, quantity: #{quantity}")
 
@@ -56,7 +62,9 @@ defmodule Naive.Trader do
   end
 
   def handle_cast(
-    %TradeEvent{buyer_order_id: order_id, quantity: quantity},
+    %TradeEvent{
+      buyer_order_id: order_id,
+      quantity: quantity},
     %State{
       symbol: symbol,
       buy_order: %Binance.OrderResponse{
