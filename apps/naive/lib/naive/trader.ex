@@ -18,7 +18,7 @@ defmodule Naive.Trader do
   end
 
   def start_link(%{} = args) do
-    GenServer.start_link(__MODULE__, args)
+    GenServer.start_link(__MODULE__, args, name: :trader)
   end
 
   def init(%{symbol: symbol, profile_interval: profit_interval}) do

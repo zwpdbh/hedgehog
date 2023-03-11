@@ -7,6 +7,7 @@ defmodule Streamer.Binance do
   def start_link(symbol) do
     symbol = String.downcase(symbol)
     trade_stream = "#{@stream_endpoint}#{symbol}@trade"
+
     WebSockex.start_link(trade_stream, __MODULE__, nil)
   end
 
