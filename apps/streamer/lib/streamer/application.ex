@@ -10,6 +10,8 @@ defmodule Streamer.Application do
     children = [
       # Starts a worker by calling: Streamer.Worker.start_link(arg)
       # {Streamer.Worker, arg}
+      Phoenix.PubSub,
+      name: Streamer.PubSub, adapter_name: Phoenix.PubSub.PG2
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
