@@ -9,8 +9,11 @@
 # move said applications out of the umbrella.
 import Config
 
-config :logger,
-  level: :info
+config :logger, :console,
+  # level: :debug,
+  level: :info,
+  format: "$date $time [$level] $metadata$message\n"
+
 # Sample configuration:
 #
 #     config :logger, :console,

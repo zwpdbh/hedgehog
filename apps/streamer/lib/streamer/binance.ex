@@ -4,6 +4,8 @@ defmodule Streamer.Binance do
 
   @stream_endpoint "wss://stream.binance.us:9443/ws/"
 
+  # use this as
+  # Streamer.Binance.start_link("ethusd")
   def start_link(symbol) do
     symbol = String.downcase(symbol)
     trade_stream = "#{@stream_endpoint}#{symbol}@trade"
@@ -11,12 +13,17 @@ defmodule Streamer.Binance do
   end
 
   def handle_frame({_type, msg}, state) do
-    case Poison.decode(msg) do
+    case Jason.decode(msg) do
       {:ok, event} -> process_event(event)
       {:error, _} -> Logger.error("Unable to parse msg: #{msg}")
     end
 
     {:ok, state}
+  end
+
+  def handle_cast({:send, {type, msg} = frame}, state) do
+    IO.puts("Sending #{type} frame with payload: #{msg}")
+    {:reply, frame, state}
   end
 
   defp process_event(%{"e" => "trade"} = event) do
@@ -35,7 +42,7 @@ defmodule Streamer.Binance do
 
     Logger.debug(
       "Trade event received" <>
-      "#{trade_event.symbol}@#{trade_event.price}"
+        "#{trade_event.symbol}@#{trade_event.price}"
     )
   end
 end
