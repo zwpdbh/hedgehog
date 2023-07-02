@@ -10,6 +10,7 @@
 import Config
 
 config :logger, :console,
+  # We could change log level to filter different level of log to display
   # level: :debug,
   level: :info,
   format: "$date $time [$level] $metadata$message\n"
@@ -21,3 +22,10 @@ config :logger, :console,
 #       format: "$date $time [$level] $metadata$message\n",
 #       metadata: [:user_id]
 #
+
+# Import secrets file with Binance keys if it exists
+secrets = Path.join([File.cwd!(), "config/secrets.exs"])
+
+if File.exists?(secrets) do
+  import_config(secrets)
+end

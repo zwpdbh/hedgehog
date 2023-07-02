@@ -9,6 +9,7 @@ defmodule Streamer.Binance do
   def start_link(symbol) do
     symbol = String.downcase(symbol)
     trade_stream = "#{@stream_endpoint}#{symbol}@trade"
+
     WebSockex.start_link(trade_stream, __MODULE__, nil)
   end
 
@@ -44,5 +45,13 @@ defmodule Streamer.Binance do
       "Trade event received" <>
         "#{trade_event.symbol}@#{trade_event.price}"
     )
+
+    # Naive.send_event(trade_event)
+    Phoenix.PubSub.broadcast(
+      Streamer.PubSub,
+      "TRADE_EVENTS:#{trade_event.symbol}",
+      trade_event
+    )
+
   end
 end
