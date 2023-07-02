@@ -19,10 +19,8 @@ erl_crash.dump
 # Also ignore archive artifacts (built via "mix archive.build").
 *.ez
 
+# Ignore package tarball (built via "mix hex.build").
+playground-*.tar
+
 # Temporary files, for example, from tests.
 /tmp/
-
-# .gitignore
-# This should be ignored but for studying purpose, we don't do it.
-# That is fine because we don't have a real Binance account.
-# config/secrets.exs

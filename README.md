@@ -30,6 +30,7 @@ This is my practise of [Hands-on Elixir & OTP: Cryptocurrency trading bot](https
   - During initialization, it fetch `tick_size` for that symbol.
 
 - How a simple trader works?
+
   - The trader takes decision based on its own state and the incoming trade events.
     - First state - A new trader
       - At the beginner, there is no buy order or sell order stored in the trader's state.
@@ -45,5 +46,40 @@ This is my practise of [Hands-on Elixir & OTP: Cryptocurrency trading bot](https
       - Similar with buy order filled, we match incoming trade event with `sell_order`.
       - Notice: after a sell order get filled, a trade profit cycle is complete. We simply terminate the trader.
   - Do not forget to implement a default call back function at the bottom that just ignore all other incoming events.
+
+- The progress is:
+  - We created represent a trader using GenServer.
+  - This trader will do a simple trade cycle and exit.
+  - We send event directly from Streamer to Trader. -- This create a direct link between them, we will solve this in Chapter03.
+
+### Chapter03
+
+The focus of this chapter is to solve the problem we introduced in Chapter02. We need to decouple Streamer and Trader.
+
+- In Chapter02, Streamer send events to Trader directly: `Naive.send_event(trade_event)`. \
+  Streamer.Binance -send event-> Naive -GenServer.call(:trader, event)-> Naive.Trader
+
+  It has two problems:
+
+  - It only support one trader (because the trader's name is `:trader` and only one process can be registered under a single name).
+  - Streamer needs to be aware of all processes that are interested in the streamed data and explicitly push that information to them.
+
+- [PubSub](https://hexdocs.pm/phoenix_pubsub/Phoenix.PubSub.html) design \
+  Streamer.Binance -broadcast-> Phoenix.PubSub -subscribe handle_info-> Naive.Trader
+
+  - The streamer will broadcast trade events to the PubSub topic.
+  - Whatever is interested in that data, can subscribe to the topic and it will receive the broadcasted messages.
+  - There’s no coupling between the Streamer and Naive app anymore.
+  - We can create multiple traders and each one can subscribe to different topic and receive different message from PubSub.
+
+- Steps
+  - Install `phoenix_pubsub` in both streamer and naive apps.
+  - In Streamer
+    - For each message broadcast it to its corresponding topic -- the trade event's symbol.
+  - In Trader
+    - During GenServer's init we pass the symbol, we could simply subscribe to its topic.
+    - Use `GenServer.handle_info` to handle messages.
+
+### Chapter03
 
 ## Other Notes
