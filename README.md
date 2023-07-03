@@ -80,6 +80,6 @@ The focus of this chapter is to solve the problem we introduced in Chapter02. We
     - During GenServer's init we pass the symbol, we could simply subscribe to its topic.
     - Use `GenServer.handle_info` to handle messages.
 
-### Chapter03
+### Chapter04
 
 ## Other Notes

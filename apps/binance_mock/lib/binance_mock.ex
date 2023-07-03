@@ -46,6 +46,51 @@ defmodule BinanceMock do
     }
   end
 
+  def subscribe_to_topic(symbol, subscriptions) do
+    symbol = String.upcase(symbol)
+    stream_name = "TRADE_EVENTS:#{symbol}"
+
+    case Enum.member?(subscriptions, symbol) do
+      false ->
+        Logger.debug("#{__MODULE__} subscribing to #{stream_name}")
+
+        Phoenix.PubSub.subscribe(
+          Streamer.PubSub,
+          stream_name
+        )
+
+        [symbol | subscriptions]
+
+      true ->
+        subscriptions
+    end
+  end
+
+  defp add_order(%Binance.Order{symbol: symbol} = order, order_books) do
+    order_book = Map.get(order_books, :"#{symbol}", %OrderBook{})
+
+    updated_order_book =
+      case order.side do
+        "SELL" ->
+          Map.replace!(
+            order_book,
+            :sell_side,
+            [order | order_book.sell_side]
+            |> Enum.sort(&D.lt?(&1.price, &2.price))
+          )
+
+        "BUY" ->
+          Map.replace!(
+            order_book,
+            :buy_side,
+            [order | order_book.buy_side]
+            |> Enum.sort(&D.gt?(&1.price, &2.price))
+          )
+      end
+
+    Map.put(order_books, :"#{symbol}", updated_order_book)
+  end
+
   def get_exchange_info do
     Binance.get_exchange_info()
   end
