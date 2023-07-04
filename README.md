@@ -80,6 +80,44 @@ The focus of this chapter is to solve the problem we introduced in Chapter02. We
     - During GenServer's init we pass the symbol, we could simply subscribe to its topic.
     - Use `GenServer.handle_info` to handle messages.
 
-### Chapter03
+### [Chapter04](https://book.elixircryptobot.com/mock-the-binance-api.html#objectives-3)
+
+- What features do we need for this BinanceMock ?
+
+  - It need to cover the REST API call .
+  - It need to broadcast fake events. \
+    Make the BinanceMock process subscribe to the trade events stream and try to broadcast fake trade events whenever the price of orders would be matched.
+
+- What state it needs to hold ?
+
+  - `order_book`, a map for hold each trade symbol.
+
+    - Each symbol has a `%OrderBook{}`
+    - `%OrderBook{}` contains fields
+      - `buy_side`: []
+      - `sell_side`: []
+      - `historical`: []
+
+  - List of symbols that mock subscribed to. (BinanceMock will forward certain Binance events for certain symbols.)
+  - Last generated id - for consistent generating of unique ids for fake trade events.
+
+- The REST API features
+
+  - `get_exchange_info` -- we will use `Binance.get_exchange_info()` since it is public available.
+  - Place buy and sell orders
+
+    - Generate a fake order based on symbol, quantity, price, and side.
+    - Cast a message to the BinanceMock process to add the fake order.
+    - Return a tuple with `%OrderResponse{}`.
+
+- Implement order retrival (4.6)
+
+  - Why we don't know the order's side
+
+- Implement callback for incoming trade events -- from 4.7 \
+
+  We need to handle incoming trade events streamed from the PubSub topic.
+
+  -
 
 ## Other Notes

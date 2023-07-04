@@ -47,11 +47,11 @@ defmodule Streamer.Binance do
     )
 
     # Naive.send_event(trade_event)
+    # No need this anymore because now the trader receive messages by subscribe topic.
     Phoenix.PubSub.broadcast(
       Streamer.PubSub,
       "TRADE_EVENTS:#{trade_event.symbol}",
       trade_event
     )
-
   end
 end
