@@ -8,6 +8,7 @@ defmodule BinanceMock do
 
   use GenServer
 
+  alias Binance.Order
   alias Decimal, as: D
   alias Streamer.Binance.TradeEvent
 
@@ -91,6 +92,76 @@ defmodule BinanceMock do
     Map.put(order_books, :"#{symbol}", updated_order_book)
   end
 
+  def handle_call(:generate_id, _from, %State{fake_order_id: id} = state) do
+    {:reply, id + 1, %{state | fake_order_id: id + 1}}
+  end
+
+  def handle_call(
+        {:get_order, symbol, time, order_id},
+        _from,
+        %State{order_books: order_books} = state
+      ) do
+    order_book = Map.get(order_books, :"#{symbol}", %OrderBook{})
+
+    result =
+      (order_book.buy_side ++ order_book.sell_side ++ order_book.historical)
+      |> Enum.find(
+        &(&1.symbol == symbol and
+            &1.time == time and
+            &1.order_id == order_id)
+      )
+
+    {:reply, {:ok, result}, state}
+  end
+
+  def handle_info(%TradeEvent{} = trade_event, %{order_books: order_books} = state) do
+    order_book = Map.get(order_books, :"#{trade_event.symbol}", %OrderBook{})
+
+    filled_buy_orders =
+      order_book.buy_side
+      |> Enum.take_while(&D.lt?(trade_event.price, &1.price))
+      |> Enum.map(&Map.replace!(&1, :status, "FILLED"))
+
+    filled_sell_orders =
+      order_book.sell_side
+      |> Enum.take_while(&D.gt?(trade_event.price, &1.price))
+      |> Enum.map(&Map.replace!(&1, :status, "FILLED"))
+
+    (filled_buy_orders ++ filled_sell_orders)
+    |> Enum.map(&convert_order_to_event(&1, trade_event.event_time))
+    |> Enum.each(&broadcast_trade_event/1)
+
+    remaining_buy_orders =
+      order_book.buy_side
+      |> Enum.drop(length(filled_buy_orders))
+
+    remaining_sell_orders =
+      order_book.sell_side
+      |> Enum.drop(length(filled_sell_orders))
+
+    order_books =
+      Map.replace!(
+        order_books,
+        :"#{trade_event.symbol}",
+        %{
+          buy_side: remaining_buy_orders,
+          sell_side: remaining_sell_orders,
+          historical:
+            filled_buy_orders ++
+              filled_sell_orders ++
+              order_book.historical
+        }
+      )
+
+    {:noreply, %{state | order_books: order_books}}
+  end
+
+  # Client APIs
+
+  def get_order(symbol, time, order_id) do
+    GenServer.call(__MODULE__, {:get_order, symbol, time, order_id})
+  end
+
   def get_exchange_info do
     Binance.get_exchange_info()
   end
@@ -113,11 +184,49 @@ defmodule BinanceMock do
         side
       )
 
+    # Why we cast message here ? Because we want the handle of order happended in GenServer's server process.
     GenServer.cast(
       __MODULE__,
       {:add_order, fake_order}
     )
 
     {:ok, convert_order_to_order_response(fake_order)}
+  end
+
+  defp generate_fake_order(symbol, quantity, price, side)
+       when is_binary(symbol) and is_binary(quantity) and is_binary(price) and
+              (side == "BUY" or side == "SELL") do
+    current_timestamp = :os.system_time(:millisecond)
+
+    # Notice we generate id inside GenServer
+    order_id = GenServer.call(__MODULE__, :generate_id)
+
+    client_order_id = :crypto.hash(:md5, "#{order_id}") |> Base.encode16()
+
+    Binance.Order.new(%{
+      symbol: symbol,
+      order_id: order_id,
+      client_order_id: client_order_id,
+      price: price,
+      orig_qty: quantity,
+      executed_qty: "0.00000000",
+      cummulative_quote_qty: "0.00000000",
+      status: "NEW",
+      time_in_force: "GTC",
+      type: "LIMIT",
+      side: side,
+      stop_price: "0.00000000",
+      iceberg_qty: "0.00000000",
+      time: current_timestamp,
+      update_time: current_timestamp,
+      is_working: true
+    })
+  end
+
+  defp convert_order_to_order_response(%Binance.Order{} = order) do
+    %{
+      struct(Binance.OrderResponse, order |> Map.to_list())
+      | transact_time: order.time
+    }
   end
 end

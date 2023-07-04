@@ -12,4 +12,38 @@ defmodule Playground do
     Naive.Trader.start_link(%{symbol: "ethusd", profile_interval: "0.01"})
     Naive.Trader.start_link(%{symbol: "xrpusdt", profile_interval: "0.02"})
   end
+
+  defmodule Person do
+    defstruct [
+      :first_name,
+      :last_name,
+      :cell_phone
+    ]
+
+    use ExConstructor
+  end
+
+  defmodule Customer do
+    defstruct [
+      :first_name,
+      :last_name,
+      :phone
+    ]
+  end
+
+  def demo_convert_struct_to_another() do
+    # Notice we have to `use ExConstructor` in Person struct's definition.
+    # It will inject a constructor function into the module.
+    p =
+      Person.new(%{
+        first_name: "zw",
+        last_name: "pdbh",
+        cell_phone: "123456"
+      })
+
+    %{
+      struct(Playground.Customer, p |> Map.to_list())
+      | phone: p.cell_phone
+    }
+  end
 end

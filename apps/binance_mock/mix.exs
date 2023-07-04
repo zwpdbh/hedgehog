@@ -12,6 +12,8 @@ defmodule BinanceMock.MixProject do
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       deps: deps()
+
+      # xref: [exclude: [Binance.Order]]
     ]
   end
 
@@ -30,7 +32,8 @@ defmodule BinanceMock.MixProject do
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"},
       # {:sibling_app_in_umbrella, in_umbrella: true}
       {:decimal, "~> 2.0"},
-      {:phoenix_pubsub, "~> 2.0"}
+      {:phoenix_pubsub, "~> 2.0"},
+      {:binance, "~> 1.0"}
     ]
   end
 end
