@@ -8,7 +8,8 @@ defmodule BinanceMock do
 
   use GenServer
 
-  alias Binance.Order
+  # alias Phoenix.PubSub
+  # alias Binance.Order
   alias Decimal, as: D
   alias Streamer.Binance.TradeEvent
 
@@ -114,6 +115,7 @@ defmodule BinanceMock do
     {:reply, {:ok, result}, state}
   end
 
+  # Handle incoming trade events (streamed from the PubSub topic)
   def handle_info(%TradeEvent{} = trade_event, %{order_books: order_books} = state) do
     order_book = Map.get(order_books, :"#{trade_event.symbol}", %OrderBook{})
 
@@ -154,6 +156,29 @@ defmodule BinanceMock do
       )
 
     {:noreply, %{state | order_books: order_books}}
+  end
+
+  defp convert_order_to_event(%Binance.Order{} = order, time) do
+    %TradeEvent{
+      event_type: order.type,
+      event_time: time - 1,
+      symbol: order.symbol,
+      trade_id: Integer.floor_div(time, 1000),
+      price: order.price,
+      quantity: order.orig_qty,
+      buyer_order_id: order.order_id,
+      seller_order_id: order.order_id,
+      trade_time: time - 1,
+      buyer_market_maker: false
+    }
+  end
+
+  defp broadcast_trade_event(%Streamer.Binance.TradeEvent{} = trade_event) do
+    Phoenix.PubSub.broadcast(
+      Streamer.PubSub,
+      "TRADE_EVENTS:#{trade_event.symbol}",
+      trade_event
+    )
   end
 
   # Client APIs

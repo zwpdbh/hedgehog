@@ -118,6 +118,4 @@ The focus of this chapter is to solve the problem we introduced in Chapter02. We
 
   We need to handle incoming trade events streamed from the PubSub topic.
 
-  -
-
 ## Other Notes
