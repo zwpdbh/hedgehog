@@ -9,8 +9,8 @@ defmodule Playground do
     # Currently, this will has error like HTTP timeout.
     # Because Binance.get_exchange_info() will timeout (we don't have Binance account).
     Streamer.start_streaming("ethusd")
-    Naive.Trader.start_link(%{symbol: "ethusd", profile_interval: "0.01"})
-    Naive.Trader.start_link(%{symbol: "xrpusdt", profile_interval: "0.02"})
+    Naive.Trader.start_link(%{symbol: "ethusd", profit_interval: "0.01"})
+    Naive.Trader.start_link(%{symbol: "xrpusdt", profit_interval: "0.02"})
   end
 
   defmodule Person do
@@ -45,5 +45,10 @@ defmodule Playground do
       struct(Playground.Customer, p |> Map.to_list())
       | phone: p.cell_phone
     }
+  end
+
+  def demo_chapter_04() do
+    Streamer.start_streaming("ethusdt")
+    Naive.Trader.start_link(%{symbol: "ETHUSDT", profit_interval: "-0.001"})
   end
 end

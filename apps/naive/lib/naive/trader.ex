@@ -4,6 +4,8 @@ defmodule Naive.Trader do
   alias Streamer.Binance.TradeEvent
   alias Decimal, as: D
 
+  @binance_client Application.compile_env(:naive, :binance_client, BinanceMock)
+
   defmodule State do
     # This will ensure that we won’t create an invalid %State{} without those values.
     @enforce_keys [:symbol, :profit_interval, :tick_size]
@@ -23,7 +25,7 @@ defmodule Naive.Trader do
   end
 
   # The init's parameter is passed from GenServer.start_link
-  def init(%{symbol: symbol, profile_interval: profit_interval}) do
+  def init(%{symbol: symbol, profit_interval: profit_interval}) do
     symbol = String.upcase(symbol)
     Logger.info("Initializing new trader for #{symbol}")
 
@@ -47,7 +49,7 @@ defmodule Naive.Trader do
   defp fetch_tick_size(symbol) do
     # The result from Binance.get_exchange_info is like:
     # https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md#exchange-information
-    Binance.get_exchange_info()
+    @binance_client.get_exchange_info()
     |> elem(1)
     |> Map.get(:symbols)
     |> Enum.find(&(&1["symbol"] == symbol))
@@ -69,7 +71,7 @@ defmodule Naive.Trader do
     Logger.info("Placing Buy order for #{symbol} @#{price}, quantity: #{quantity}")
 
     {:ok, %Binance.OrderResponse{} = order} =
-      Binance.order_limit_buy(symbol, quantity, price, "GTC")
+      @binance_client.order_limit_buy(symbol, quantity, price, "GTC")
 
     {:noreply, %{state | buy_order: order}}
   end
@@ -98,7 +100,7 @@ defmodule Naive.Trader do
     )
 
     {:ok, %Binance.OrderResponse{} = order} =
-      Binance.order_limit_sell(symbol, quantity, sell_price, "GTC")
+      @binance_client.order_limit_sell(symbol, quantity, sell_price, "GTC")
 
     {:noreply, %{state | sell_order: order}}
   end

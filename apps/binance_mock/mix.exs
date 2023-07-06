@@ -33,7 +33,8 @@ defmodule BinanceMock.MixProject do
       # {:sibling_app_in_umbrella, in_umbrella: true}
       {:decimal, "~> 2.0"},
       {:phoenix_pubsub, "~> 2.0"},
-      {:binance, "~> 1.0"}
+      {:binance, "~> 1.0"},
+      {:streamer, in_umbrella: true}
     ]
   end
 end

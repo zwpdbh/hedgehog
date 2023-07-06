@@ -16,7 +16,7 @@ defmodule Streamer do
     :world
   end
 
-  # symbol could be "ethusd". It looks like "ETH/USD" on https://www.binance.us/price/Ethereum
+  # symbol could be "ethusdt". It looks like "ETH/USD" on https://www.binance.us/price/Ethereum
   def start_streaming(symbol) do
     Streamer.Binance.start_link(symbol)
   end

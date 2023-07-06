@@ -9,6 +9,14 @@
 # move said applications out of the umbrella.
 import Config
 
+config :binance,
+  api_key: "xxx",
+  secret_key: "xxx",
+  # Add for the US API end point. The default is for "https://api.binance.com"
+  end_point: "https://api.binance.us"
+
+config :naive, :binance_client, BinanceMock
+
 config :logger, :console,
   # We could change log level to filter different level of log to display
   # level: :debug,
@@ -24,8 +32,8 @@ config :logger, :console,
 #
 
 # Import secrets file with Binance keys if it exists
-secrets = Path.join([File.cwd!(), "config/secrets.exs"])
+# secrets = Path.join([File.cwd!(), "config/secrets.exs"])
 
-if File.exists?(secrets) do
-  import_config(secrets)
-end
+# if File.exists?(secrets) do
+#   import_config(secrets)
+# end

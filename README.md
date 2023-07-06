@@ -26,7 +26,7 @@ This is my practise of [Hands-on Elixir & OTP: Cryptocurrency trading bot](https
     - tick size
       - [Tick size](https://www.investopedia.com/terms/t/tick-size.asp) refers to the minimum price movement of a trading instrument in a market.
       - Tick size differs between symbols and it is the smallest acceptable price movement up or down.
-  - It is initialized by a `symbol` and `profile_interval`.
+  - It is initialized by a `symbol` and `profit_interval`.
   - During initialization, it fetch `tick_size` for that symbol.
 
 - How a simple trader works?
