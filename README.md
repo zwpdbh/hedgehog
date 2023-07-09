@@ -118,4 +118,43 @@ The focus of this chapter is to solve the problem we introduced in Chapter02. We
 
   We need to handle incoming trade events streamed from the PubSub topic.
 
+### Review Chapter04
+
+So what we have built ? In general, we have build a event system with PubSub at its center:
+
+- A streamer is a GenServer process
+
+  - A streamer connect to a websocket(`WebSockex`) for a specific symbol's messages.
+  - Use `handle_frame` to handle incoming messages from websocket, the streamer format it and use PubSub to broadcast to a corresponding channel.
+
+- A trader is implemented as a GenServer process.
+
+  - A trader initialize itself by subscribing to a symbol's topic from PubSub.
+  - The trading events are sent to it and the trader handles it via `handle_info`.
+  - A simple trade strategy is implemented.
+
+- BinanceMock is configured in `config.exs`.
+
+  - Trader will use BinanceMock or Binance via
+
+    ```elixir
+    Use `handle_frame` to handle incoming messages from websocket
+    ```
+
+  - BinanceMock is also a GenServer process. It needs to handle two kinds of messages:
+
+    - Messages from trader's call using `handle_cast`: This is the trade order request send from traders.
+
+      - Subscribe the same trade event in PubSub as the trader.
+      - Add order into an `%OrderBook{}`
+
+    - Messages from PubSub using `handle_info`:
+
+      - Those events are real Binance events from streamer. So, we don't need to figure out how to generate reasonable events.
+      - We use those events to process the OrderBook.
+      - Similate an order is filled and send trade event to PubSub.
+
+        - So from a trader's point of view, its `handle_info` does not care where the trade events comes from. It is just a message delivered from subscription to PubSub.
+        - That is the point of BinanceMock: A trader could configure its `@binance_client` to be Binance or BinanceMock. Other code remains the abolute unchanged.
+
 ## Other Notes

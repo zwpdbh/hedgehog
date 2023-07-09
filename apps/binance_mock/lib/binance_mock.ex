@@ -31,11 +31,17 @@ defmodule BinanceMock do
     {:ok, %State{}}
   end
 
+  # Callback for handling "add order" request from trader.
   def handle_cast(
         {:add_order, %Binance.Order{symbol: symbol} = order},
         %State{order_books: order_books, subscriptions: subscriptions} = state
       ) do
+    # 1. Subscribe stream event for the order's symbol because we will fill a trader's order based on a corresponding event from websocket arrived.
+    # The incoming websocket event from PubSub will be handled by:
+    # handle_info(%TradeEvent{} = trade_event, %{order_books: order_books} = state)
     new_subscriptions = subscribe_to_topic(symbol, subscriptions)
+
+    # 2. Add the trader's order to order book
     updated_order_books = add_order(order, order_books)
 
     {
@@ -48,7 +54,7 @@ defmodule BinanceMock do
     }
   end
 
-  def subscribe_to_topic(symbol, subscriptions) do
+  defp subscribe_to_topic(symbol, subscriptions) do
     symbol = String.upcase(symbol)
     stream_name = "TRADE_EVENTS:#{symbol}"
 
@@ -200,6 +206,7 @@ defmodule BinanceMock do
   end
 
   defp order_limit(symbol, quantity, price, side) do
+    # 1. Generate fake order
     %Binance.Order{} =
       fake_order =
       generate_fake_order(
@@ -209,12 +216,13 @@ defmodule BinanceMock do
         side
       )
 
-    # Why we cast message here ? Because we want the handle of order happended in GenServer's server process.
+    # 2. Submit fake order to server process
     GenServer.cast(
       __MODULE__,
       {:add_order, fake_order}
     )
 
+    # 3. convert order to order response
     {:ok, convert_order_to_order_response(fake_order)}
   end
 
@@ -250,6 +258,7 @@ defmodule BinanceMock do
     })
   end
 
+  # Simply convert %Binance.Order{} to %Binance.OrderResponse{}
   defp convert_order_to_order_response(%Binance.Order{} = order) do
     %{
       struct(Binance.OrderResponse, order |> Map.to_list())
