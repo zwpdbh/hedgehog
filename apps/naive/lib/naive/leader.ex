@@ -70,4 +70,8 @@ defmodule Naive.Leader do
     ref = Process.monitor(pid)
     %TraderData{pid: pid, ref: ref, state: state}
   end
+
+  def notify(:trader_state_updated, trader_state) do
+    GenServer.call(:"#{__MODULE__}-#{trader_state.symbol}", {:update_trader_state, trader_state})
+  end
 end

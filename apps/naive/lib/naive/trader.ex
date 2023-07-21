@@ -1,5 +1,5 @@
 defmodule Naive.Trader do
-  use GenServer
+  use GenServer, restart: :temporary
   require Logger
   alias Streamer.Binance.TradeEvent
   alias Decimal, as: D
@@ -20,43 +20,60 @@ defmodule Naive.Trader do
 
   # Register this GenServer, usually we give it a name at this moment.
   # The args we passed in GenServer.start_link will be used as the parameter for init.
-  def start_link(%{} = args) do
-    GenServer.start_link(__MODULE__, args, name: :trader)
+  # def start_link(%{} = args) do
+  #   GenServer.start_link(__MODULE__, args, name: :trader)
+  # end
+
+  def start_link(%State{} = state) do
+    GenServer.start_link(__MODULE__, state)
   end
 
-  # The init's parameter is passed from GenServer.start_link
-  def init(%{symbol: symbol, profit_interval: profit_interval}) do
+  # # The init's parameter is passed from GenServer.start_link
+  # def init(%{symbol: symbol, profit_interval: profit_interval}) do
+  #   symbol = String.upcase(symbol)
+  #   Logger.info("Initializing new trader for #{symbol}")
+
+  #   Phoenix.PubSub.subscribe(
+  #     Streamer.PubSub,
+  #     "TRADE_EVENTS:#{symbol}"
+  #   )
+
+  #   # After we got events from websocket stream, we fetch those symbol's tick_size.
+  #   # Tick size
+  #   tick_size = fetch_tick_size(symbol)
+
+  #   {:ok,
+  #    %State{
+  #      symbol: symbol,
+  #      profit_interval: profit_interval,
+  #      tick_size: tick_size
+  #    }}
+  # end
+
+  def init(%State{symbol: symbol} = state) do
     symbol = String.upcase(symbol)
-    Logger.info("Initializing new trader for #{symbol}")
+
+    Logger.info("Initializing new trader for symbol(#{symbol})")
 
     Phoenix.PubSub.subscribe(
       Streamer.PubSub,
       "TRADE_EVENTS:#{symbol}"
     )
 
-    # After we got events from websocket stream, we fetch those symbol's tick_size.
-    # Tick size
-    tick_size = fetch_tick_size(symbol)
-
-    {:ok,
-     %State{
-       symbol: symbol,
-       profit_interval: profit_interval,
-       tick_size: tick_size
-     }}
+    {:ok, state}
   end
 
-  defp fetch_tick_size(symbol) do
-    # The result from Binance.get_exchange_info is like:
-    # https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md#exchange-information
-    @binance_client.get_exchange_info()
-    |> elem(1)
-    |> Map.get(:symbols)
-    |> Enum.find(&(&1["symbol"] == symbol))
-    |> Map.get("filters")
-    |> Enum.find(&(&1["filterType"] == "PRICE_FILTER"))
-    |> Map.get("tickSize")
-  end
+  # defp fetch_tick_size(symbol) do
+  #   # The result from Binance.get_exchange_info is like:
+  #   # https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md#exchange-information
+  #   @binance_client.get_exchange_info()
+  #   |> elem(1)
+  #   |> Map.get(:symbols)
+  #   |> Enum.find(&(&1["symbol"] == symbol))
+  #   |> Map.get("filters")
+  #   |> Enum.find(&(&1["filterType"] == "PRICE_FILTER"))
+  #   |> Map.get("tickSize")
+  # end
 
   def handle_info(
         %TradeEvent{
@@ -73,7 +90,10 @@ defmodule Naive.Trader do
     {:ok, %Binance.OrderResponse{} = order} =
       @binance_client.order_limit_buy(symbol, quantity, price, "GTC")
 
-    {:noreply, %{state | buy_order: order}}
+    new_state = %{state | buy_order: order}
+    Naive.Leader.notify(:trader_state_updated, new_state)
+
+    {:noreply, new_state}
   end
 
   def handle_info(
@@ -102,7 +122,10 @@ defmodule Naive.Trader do
     {:ok, %Binance.OrderResponse{} = order} =
       @binance_client.order_limit_sell(symbol, quantity, sell_price, "GTC")
 
-    {:noreply, %{state | sell_order: order}}
+    new_state = %{state | sell_order: order}
+    Naive.Leader.notify(:trader_state_updated, new_state)
+
+    {:noreply, new_state}
   end
 
   def handle_info(

@@ -209,4 +209,7 @@ So what we have built ? In general, we have build a event system with PubSub at 
 
   Then, click the "Application" tab at the top --> go to the list on the left and select `naive` application.
 
+- To understand 
+  - [https://book.elixircryptobot.com/enable-parallel-trading-on-multiple-symbols.html#finalizing-naive.leader-implementation](https://book.elixircryptobot.com/enable-parallel-trading-on-multiple-symbols.html#finalizing-naive.leader-implementation)
+
 ## Other Notes
