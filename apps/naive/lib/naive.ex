@@ -25,4 +25,14 @@ defmodule Naive do
     # GenServer.start_link(__MODULE__, args, name: :trader).
     GenServer.cast(:trader, event)
   end
+
+  def start_trading(symbol) do
+    symbol = String.upcase(symbol)
+
+    {:ok, _pid} =
+      DynamicSupervisor.start_child(
+        Naive.DynamicSymbolSupervisor,
+        {Naive.SymbolSupervisor, symbol}
+      )
+  end
 end

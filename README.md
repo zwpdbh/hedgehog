@@ -135,10 +135,10 @@ So what we have built ? In general, we have build a event system with PubSub at 
 
 - BinanceMock is configured in `config.exs`.
 
-  - Trader will use BinanceMock or Binance via
+  - Trader will use BinanceMock or Binance via configuration of our umbrella project.
 
     ```elixir
-    Use `handle_frame` to handle incoming messages from websocket
+    config :naive, :binance_client, BinanceMock
     ```
 
   - BinanceMock is also a GenServer process. It needs to handle two kinds of messages:
@@ -156,5 +156,57 @@ So what we have built ? In general, we have build a event system with PubSub at 
 
         - So from a trader's point of view, its `handle_info` does not care where the trade events comes from. It is just a message delivered from subscription to PubSub.
         - That is the point of BinanceMock: A trader could configure its `@binance_client` to be Binance or BinanceMock. Other code remains the abolute unchanged.
+
+
+## [Chapter05](https://book.elixircryptobot.com/enable-parallel-trading-on-multiple-symbols.html)
+
+- Limition so far 
+  -  We start the `Naive.Trader` process from `iex`. 
+  -  So whenever a trader process terminates, a new one won't get started as it is not supervised. 
+
+- Features we want 
+  -  Allow multiple traders in parallel per symbol. 
+     -  In system, we are trading multiple symbol. 
+     -  For each symbol, there are multiple trader are working on it. 
+
+- Design v1 
+  - Use a supervisor to supervise the trader process.
+  - Start a new trader process whenever the previous one finished/crashed.
+
+- Design v2 
+  - Introduce `Naive.Leader` to track trader's data.
+  - `Naive.Leader` is also responsible for start and restart `Naive.Trader` via `Naive.DynamicTraderSupervisor`.
+  - So far, our system could start and supervise multiple traders for a single symbol. 
+
+- Design V3 
+  - To support multiple symbol. We need to manage multiple: `Naive.Trader` + `Naive.DynamicTraderSupervisor` + multiple `Naive.Trader`.
+    - In other words, we need to manage multiple `Naive.Leader` and `Naive.DynamicTraderSupervisor`.  
+    - We introduce `Naive.SymbolSupervisor` to start both `Naive.Leader` and `NaiveDynamicTraderSupervisor`.  
+    - One symbol for one `Naive.SymbolSupervisor`, so we need a way to manage multiple `Naive.SymbolSupervisor`. 
+  - Similar in how to restart multiple trader situation: 
+    - Whenever we need to use a service to manage a group of services, we don't do this directly. 
+    - Instead, we use a service to start a supervisor and that supervisor start the worker services. 
+  - Therefore, we use `Naive.Supervisor` to dynamically start a `Naive.DynamicSymbolSupervisor` and it start multiple `Naive.SymbolSupervisor`. 
+
+- Supervisor vs DynamicSupervisor 
+  - They can all manage children processes.
+  - The differences is that: 
+    - Supervisor is used to handle mostly static children that are started in the given order when supervisor starts. 
+    - DynamicSupervisor starts with no children. Its children are started ON demand via `start_child/2` and there is NO ordering between children.
+  - Summary
+    - Supervisor is used to start children that can be planed: numbers and orders of children are fixed.
+    - DynamicSupervisor is used to start children in response to event.
+    - In our case: 
+      - `SymbolSupervisor` is a Supervisor which its children are known: a `Naive.Leader` + `Naive.DynamicTraderSupervisor`.
+      - `Naive.DynamicSupervisor` and `Naive.DynamicSymbolSupervisor` are DynamicSupervisor because their children are created on demand.
+  - Read [How We Used Elixir's GenServers + Dynamic Supervisors to Build Concurrent, Fault Tolerant Workflows](https://www.thegreatcodeadventure.com/how-we-used-elixirs-genservers-dynamic-supervisors-to-build-concurrent-fault-tolerant-workflows/).
+
+- How to see the supervision tree
+  ```sh 
+  iex -S mix 
+  iex(1)> :observer.start()
+  ```
+
+  Then, click the "Application" tab at the top --> go to the list on the left and select `naive` application.
 
 ## Other Notes
