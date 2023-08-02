@@ -75,6 +75,13 @@ DynamicSupervisor.terminate_child(
 Notice:
 
 * The name of the process we want to find is `:"Elixir.Naive.SymbolSupervisor-ETHUSDT"` instead of `:"Naive.SymbolSupervisor-ETHUSDT"`
+* This name is the result of following Elixir code 
+  ```elixir
+    DynamicSupervisor.start_child(
+      Naive.DynamicSymbolSupervisor,
+      {Naive.SymbolSupervisor, symbol}
+    )
+  ```
 
 <!-- livebook:{"break_markdown":true} -->
 
