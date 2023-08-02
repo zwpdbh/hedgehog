@@ -2,23 +2,7 @@
 
 ## Introduction
 
-We could even recompile the remote node.
-
-```elixir
-Recompile
-```
-
-We could find the children of a supervisor.
-
-```elixir
-Supervisor.which_children(Naive.DynamicSymbolSupervisor)
-```
-
-We could find a named process's pid
-
-```elixir
-Process.whereis(Naive.SymbolSupervisor)
-```
+Playground for testing hedgehog project using attached node remotely.
 
 <!-- livebook:{"branch_parent_index":0} -->
 
@@ -46,10 +30,19 @@ Naive.start_trading("ethusdt")
 Let's see the current supervision tree after start a children from `Naive.DynamicSymbolSupervisor`.
 
 ```elixir
+DynamicSupervisor.which_children(Naive.DynamicSymbolSupervisor)
+|> Enum.each(fn {_, pid, _, _} = _each -> Process.info(pid) |> IO.inspect() end)
+```
+
+```elixir
 Kino.Process.render_sup_tree(Naive.Supervisor)
 ```
 
-### Optional
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Chapter05 (optional)
+
+### Kill temrinate a child of a supervisor
 
 After start, the terminal shows errors like:
 
@@ -73,8 +66,19 @@ Is there a way to terminate just `Naive.SymbolSupervisor-XRPUSDT`? This is start
 So, the questions is how to terminate a certain child of a dynamic supervisor?
 
 ```elixir
-DynamicSupervisor.terminate_child(Naive.DynamicSymbolSupervisor, Naive.SymbolSupervisor - XRPUSDT)
+DynamicSupervisor.terminate_child(
+  Naive.DynamicSymbolSupervisor,
+  Process.whereis(:"Elixir.Naive.SymbolSupervisor-ETHUSDT")
+)
 ```
+
+Notice:
+
+* The name of the process we want to find is `:"Elixir.Naive.SymbolSupervisor-ETHUSDT"` instead of `:"Naive.SymbolSupervisor-ETHUSDT"`
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Find a pid from a registered name
 
 Another thing to notice is when we use `Process.whereis/1`, we need to run this on the node which it is checking.
 
@@ -91,16 +95,6 @@ Process.whereis(Naive.Supervisor)
 
 Notice if the process is registered as `:"xxx.yyy.zzz"`, we need to use it as `:"xxx.yyy.zzz"`. \
 Otherwise, we need to use it as `xxx.yyy.zzz`.
-
-<!-- livebook:{"break_markdown":true} -->
-
-We could also kill all children of a supervisor by
-
-```elixir
-# Kill all its children 
-Supervisor.which_children(Naive.Supervisor)
-|> Enum.each(fn {_, pid, _, _} -> Process.exit(pid, :kill) end)
-```
 
 <!-- livebook:{"branch_parent_index":0} -->
 
