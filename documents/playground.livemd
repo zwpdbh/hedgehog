@@ -185,6 +185,14 @@ Introduce a `buy_down_interval` which will work as follow:
 
 A trader will be assigned with budget and its quantity will be calculated from it.
 
+* budget, the actual amount of money.
+* quantity, the number of share we could trade for a symbol
+* So, quantity is computed from 
+  * budget
+  * symbol's current price
+  * step_size, where `step_size` means "the intervals that a quantity/iceberg quantity can be increased or decreased by"
+    * Compare this with `tick_size`, the minimum change in the unit price.
+
 <!-- livebook:{"break_markdown":true} -->
 
 ### Update code
