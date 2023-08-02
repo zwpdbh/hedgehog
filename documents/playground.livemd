@@ -172,6 +172,31 @@ Introduce a `buy_down_interval` which will work as follow:
 
 <!-- livebook:{"branch_parent_index":0} -->
 
+## Chapter07
+
+### Review so far
+
+* we have one trader for one symbol (defined in `chunk` from `fetch_symbol_settings/1` in `Naive.Leader`).
+* we have 100 quantity to trade for that only one trader.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Objectives
+
+A trader will be assigned with budget and its quantity will be calculated from it.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Update code
+
+* `Naive.Leader`
+  * For each symbol, we need to add `step_size`.
+  * Append `budget` and `step_size` into trader's state
+* `Naive.Trader`
+  * In trader, we use `step_size` and `budget` to get the quantity.
+
+<!-- livebook:{"branch_parent_index":0} -->
+
 ## Tmp
 
 ```elixir
