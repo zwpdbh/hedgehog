@@ -47,7 +47,7 @@ defmodule Playground do
     }
   end
 
-  def demo_chapter_04() do
+  def chapter_04_demo() do
     Streamer.start_streaming("ethusdt")
     Naive.Trader.start_link(%{symbol: "ETHUSDT", profit_interval: "-0.001"})
   end
