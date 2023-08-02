@@ -1,0 +1,141 @@
+# Playground
+
+## Introduction
+
+We could even recompile the remote node.
+
+```elixir
+Recompile
+```
+
+We could find the children of a supervisor.
+
+```elixir
+Supervisor.which_children(Naive.DynamicSymbolSupervisor)
+```
+
+We could find a named process's pid
+
+```elixir
+Process.whereis(Naive.SymbolSupervisor)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Chapter05
+
+Visulaize the supervision tree we just start the project.
+
+```elixir
+Kino.Process.render_sup_tree(Naive.Supervisor)
+```
+
+At this point:
+
+* `Naive.Supervisor` is `Naive` application level supervisor.Its job is to start a dynamic supervisor: `Naive.DynamicSymbolSupervisor`.
+* `Naive.DynamicSymbolSupervisor` will start and supervise some process.
+
+<!-- livebook:{"break_markdown":true} -->
+
+Let's start to trade on some symbol
+
+```elixir
+Naive.start_trading("ethusdt")
+```
+
+Let's see the current supervision tree after start a children from `Naive.DynamicSymbolSupervisor`.
+
+```elixir
+Kino.Process.render_sup_tree(Naive.Supervisor)
+```
+
+### Optional
+
+After start, the terminal shows errors like:
+
+```txt
+2023-08-02 15:20:02.361 [error] GenServer :"Elixir.Naive.Leader-XRPUSDT" terminating
+** (BadMapError) expected a map, got: {:http_error, %HTTPoison.Error{reason: :timeout, id: nil}}
+    (elixir 1.14.3) lib/map.ex:534: Map.get({:http_error, %HTTPoison.Error{reason: :timeout, id: nil}}, :symbols, nil)
+    (naive 0.1.0) lib/naive/leader.ex:123: Naive.Leader.fetch_tick_size/1
+    (naive 0.1.0) lib/naive/leader.ex:109: Naive.Leader.fetch_symbol_settings/1
+    (naive 0.1.0) lib/naive/leader.ex:33: Naive.Leader.handle_continue/2
+    (stdlib 4.3) gen_server.erl:1123: :gen_server.try_dispatch/4
+    (stdlib 4.3) gen_server.erl:865: :gen_server.loop/7
+    (stdlib 4.3) proc_lib.erl:240: :proc_lib.init_p_do_apply/3
+Last message: {:continue, :start_trader}
+State: %{symbol: "XRPUSDT"}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+Is there a way to terminate just `Naive.SymbolSupervisor-XRPUSDT`? This is started by `Naive.DynamicSymbolSupervisor`. \
+So, the questions is how to terminate a certain child of a dynamic supervisor?
+
+```elixir
+DynamicSupervisor.terminate_child(Naive.DynamicSymbolSupervisor, Naive.SymbolSupervisor - XRPUSDT)
+```
+
+Another thing to notice is when we use `Process.whereis/1`, we need to run this on the node which it is checking.
+
+```elixir
+:rpc.call(:myapp@localhost, Process, :whereis, [Naive.Supervisor])
+```
+
+Fortunately, when we are using Livebook with attached node, we execute code directly on the remote note. \
+So, simple `Process.whereis` is good enough.
+
+```elixir
+Process.whereis(Naive.Supervisor)
+```
+
+Notice if the process is registered as `:"xxx.yyy.zzz"`, we need to use it as `:"xxx.yyy.zzz"`. \
+Otherwise, we need to use it as `xxx.yyy.zzz`.
+
+<!-- livebook:{"break_markdown":true} -->
+
+We could also kill all children of a supervisor by
+
+```elixir
+# Kill all its children 
+Supervisor.which_children(Naive.Supervisor)
+|> Enum.each(fn {_, pid, _, _} -> Process.exit(pid, :kill) end)
+```
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Tmp
+
+```elixir
+defmodule Project.Worker do
+  use GenServer
+
+  def start_link(_ignore \\ nil) do
+    GenServer.start_link(__MODULE__, nil, [])
+  end
+
+  def init(_arg) do
+    {:ok, []}
+  end
+
+  def handle_call("Hi!", _from, state) do
+    {:reply, "Hola!", state}
+  end
+end
+```
+
+```elixir
+{:ok, pid} = Project.Worker.start_link()
+```
+
+```elixir
+Process.register(pid, :"Project.Worker")
+```
+
+```elixir
+Process.whereis(Project.Worker)
+```
+
+```elixir
+Process.whereis(String.to_atom("Project.Worker"))
+```
