@@ -228,7 +228,7 @@ defmodule BinanceMock do
 
   defp generate_fake_order(symbol, quantity, price, side)
        when is_binary(symbol) and
-              is_integer(quantity) and
+              is_binary(quantity) and
               is_binary(price) and
               (side == "BUY" or side == "SELL") do
     current_timestamp = :os.system_time(:millisecond)
