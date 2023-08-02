@@ -4,6 +4,12 @@
 
 Playground for testing hedgehog project using attached node remotely.
 
+Make sure
+
+* the `@stream_endpoint` is set to `"wss://stream.binance.us:9443/ws/"`
+  (US market and EU market's endpoint is different).
+* config for `:binance`, endpoint is `https://api.binance.us`.
+
 <!-- livebook:{"branch_parent_index":0} -->
 
 ## Chapter05
