@@ -51,7 +51,9 @@ Kino.Process.render_sup_tree(Naive.Supervisor)
 In general,
 
 * From application level's root supervisor, we start a `DynamicSupervisor` -- `Naive.DynamicSymbolSupervisor`.
-* `Naive.DynamicSymbolSupervisor` start children for each trading symbol. 
+
+* `Naive.DynamicSymbolSupervisor` start children for each trading symbol.
+
   * Each children of `Naive.DynamicSymbolSupervisor` is also a supervisor.
   * For example, for trading symbol: "ethusdt", it will start a process: `Naive.SymbolSupervisor-ETHUSDT`.
   * This supervisor is started as:
@@ -61,9 +63,14 @@ In general,
           {Naive.SymbolSupervisor, symbol}
         )
         ```
-    The result is invoke the `Naive.SymbolSupervisor.start_link/1` with `ETHUSDT` as the parameter. 
+
+    - The result is invoke the `Naive.SymbolSupervisor.start_link/1` with `ETHUSDT` as the parameter.
+    - Inside `start_link`, a named supervisor is started: \
+     `Supervisor.start_link(__MODULE__, symbol, name: :"#{__MODULE__}-#{symbol}")`
     ````
+
 * `Naive.SymbolSupervisor` then use `Supervisor` to start following pair for each symbol.
+
   * `Naive.Leader` -- this is a `GenServer`
   * `Naive.DynamicTraderSupervisor` -- this is a `DynamicSupervisor`
 
@@ -122,6 +129,46 @@ Process.whereis(Naive.Supervisor)
 
 Notice if the process is registered as `:"xxx.yyy.zzz"`, we need to use it as `:"xxx.yyy.zzz"`. \
 Otherwise, we need to use it as `xxx.yyy.zzz`.
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Chapter06
+
+### Review
+
+* From Chapter05, we could see for trading one symbol. We could start multiple traders.
+* From Chapter04, we build a event system with `PubSub` at its center.
+  * A streamer use `PubSub` to broadcast to a corresponding channel.
+  * Traders subscribing to a symbol's topic from `PubSub`.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### A simple problem we want to solve
+
+* Occational, traderA's sell order could be picked up by traderB's buy order.
+* Therefore, we waste extra transaction fee for nothing (two transaction fee without any profit).
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Solution
+
+Introduce a `buy_down_interval` which will work as follow:
+
+* Instead of placing a new buy order at the current price, we place a buy order slightly lower than the current price. That is the interval between current price and the price we will buy.
+* The interval should never be smaller than double the fee we pay for transaction.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Update code
+
+* Update`Naive.Trader` 
+  * Include `buy_down_interval` into the trader's state.
+  * Calculate buy price based on:
+    * current event price.
+    * `buy_down_interval`
+    * a symbol's `tick_size`
+    * all compute using decimal precision.
+* Update `Naive.Leader` since it is managing the trader's state.
 
 <!-- livebook:{"branch_parent_index":0} -->
 
