@@ -9,10 +9,13 @@ Make sure
 * the `@stream_endpoint` is set to `"wss://stream.binance.us:9443/ws/"`
   (US market and EU market's endpoint is different).
 * config for `:binance`, endpoint is `https://api.binance.us`.
+* set VPN address to EU, such as UK.
 
 <!-- livebook:{"branch_parent_index":0} -->
 
-## Chapter05
+## Chatper05
+
+For [Chapter05](https://book.elixircryptobot.com/enable-parallel-trading-on-multiple-symbols.html).
 
 Visulaize the supervision tree we just start the project.
 
@@ -31,6 +34,7 @@ Let's start to trade on some symbol
 
 ```elixir
 Naive.start_trading("ethusdt")
+Naive.start_trading("xrpusdt")
 ```
 
 Let's see the current supervision tree after start a children from `Naive.DynamicSymbolSupervisor`.
@@ -43,6 +47,25 @@ DynamicSupervisor.which_children(Naive.DynamicSymbolSupervisor)
 ```elixir
 Kino.Process.render_sup_tree(Naive.Supervisor)
 ```
+
+In general,
+
+* From application level's root supervisor, we start a `DynamicSupervisor` -- `Naive.DynamicSymbolSupervisor`.
+* `Naive.DynamicSymbolSupervisor` start children for each trading symbol. 
+  * Each children of `Naive.DynamicSymbolSupervisor` is also a supervisor.
+  * For example, for trading symbol: "ethusdt", it will start a process: `Naive.SymbolSupervisor-ETHUSDT`.
+  * This supervisor is started as:
+    ````elixir
+        DynamicSupervisor.start_child(
+          Naive.DynamicSymbolSupervisor,
+          {Naive.SymbolSupervisor, symbol}
+        )
+        ```
+    The result is invoke the `Naive.SymbolSupervisor.start_link/1` with `ETHUSDT` as the parameter. 
+    ````
+* `Naive.SymbolSupervisor` then use `Supervisor` to start following pair for each symbol.
+  * `Naive.Leader` -- this is a `GenServer`
+  * `Naive.DynamicTraderSupervisor` -- this is a `DynamicSupervisor`
 
 <!-- livebook:{"branch_parent_index":0} -->
 
@@ -78,16 +101,7 @@ DynamicSupervisor.terminate_child(
 )
 ```
 
-Notice:
-
-* The name of the process we want to find is `:"Elixir.Naive.SymbolSupervisor-ETHUSDT"` instead of `:"Naive.SymbolSupervisor-ETHUSDT"`
-* This name is the result of following Elixir code 
-  ```elixir
-    DynamicSupervisor.start_child(
-      Naive.DynamicSymbolSupervisor,
-      {Naive.SymbolSupervisor, symbol}
-    )
-  ```
+Notice: The name of the process we want to find is `:"Elixir.Naive.SymbolSupervisor-ETHUSDT"` instead of `:"Naive.SymbolSupervisor-ETHUSDT"`
 
 <!-- livebook:{"break_markdown":true} -->
 

@@ -25,7 +25,7 @@ defmodule Naive.Leader do
 
   @impl true
   def init(symbol) do
-    {:ok, %{symbol: symbol}, {:continue, :start_trader}}
+    {:ok, %State{symbol: symbol}, {:continue, :start_trader}}
   end
 
   @impl true
@@ -119,7 +119,6 @@ defmodule Naive.Leader do
 
   defp fetch_tick_size(symbol) do
     @binance_client.get_exchange_info()
-    |> IO.inspect(label: "#{__MODULE__} 122")
     |> elem(1)
     |> Map.get(:symbols)
     |> Enum.find(&(&1["symbol"] == symbol))
