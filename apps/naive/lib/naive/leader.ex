@@ -1,6 +1,9 @@
 defmodule Naive.Leader do
   use GenServer
+  require Logger
   alias Naive.Trader
+
+  alias Decimal, as: D
 
   @binance_client Application.compile_env(:naive, :binance_client)
 
@@ -22,11 +25,13 @@ defmodule Naive.Leader do
     )
   end
 
+  @impl true
   def init(symbol) do
-    {:ok, %{symbol: symbol}, {:continue, :start_trader}}
+    {:ok, %State{symbol: symbol}, {:continue, :start_trader}}
   end
 
-  def handle_continue(:start_traders, %{symbol: symbol} = state) do
+  @impl true
+  def handle_continue(:start_trader, %{symbol: symbol} = state) do
     settings = fetch_symbol_settings(symbol)
     trader_state = fresh_trader_state(settings)
     traders = for _i <- 1..settings.chunks, do: start_new_trader(trader_state)
@@ -34,30 +39,119 @@ defmodule Naive.Leader do
     {:noreply, %{state | settings: settings, traders: traders}}
   end
 
-  defp fetch_symbol_settings(symbol) do
-    tick_size = fetch_tick_size(symbol)
+  @impl true
+  def handle_call(
+        {:update_trader_state, new_trader_state},
+        {trader_pid, _},
+        %{traders: traders} = state
+      ) do
+    case Enum.find_index(traders, fn x -> x.pid == trader_pid end) do
+      nil ->
+        Logger.warn("Tried to update the state of trader that leader is not aware of")
+        {:reply, :ok, state}
+
+      index ->
+        old_trader_data = Enum.at(traders, index)
+        new_trader_data = %{old_trader_data | :state => new_trader_state}
+
+        {:reply, :ok, %{state | :traders => List.replace_at(traders, index, new_trader_data)}}
+    end
+  end
+
+  @impl true
+  def handle_info(
+        {:DOWN, _ref, :process, trader_pid, :normal},
+        %{traders: traders, symbol: symbol, settings: settings} = state
+      ) do
+    Logger.info("#{symbol} trader finished trade - restarting")
+
+    case Enum.find_index(traders, fn x -> x.pid == trader_pid end) do
+      nil ->
+        Logger.warn(
+          "Tried to restart finished #{symbol} " <>
+            "trader that leader is not aware of"
+        )
+
+        {:noreply, state}
+
+      index ->
+        new_trader_data = start_new_trader(fresh_trader_state(settings))
+        new_traders = List.replace_at(traders, index, new_trader_data)
+
+        {:noreply, %{state | traders: new_traders}}
+    end
+  end
+
+  @impl true
+  def handle_info(
+        {:DOWN, _ref, :process, trader_pid, reason},
+        %{traders: traders, symbol: symbol} = state
+      ) do
+    Logger.error("#{symbol} trader died - reason #{reason} - trying to restart")
+
+    case Enum.find_index(traders, &(&1.pid == trader_pid)) do
+      nil ->
+        Logger.warn(
+          "Tried to restart #{symbol} trader " <>
+            "but failed to find its cached state"
+        )
+
+        {:noreply, state}
+
+      index ->
+        trader_data = Enum.at(traders, index)
+        new_trader_data = start_new_trader(trader_data.state)
+        new_traders = List.replace_at(traders, index, new_trader_data)
+
+        {:noreply, %{state | traders: new_traders}}
+    end
+  end
+
+  defp fetch_symbol_filters(symbol) do
+    symbol_filters =
+      @binance_client.get_exchange_info()
+      |> elem(1)
+      |> Map.get(:symbols)
+      |> Enum.find(fn x -> x["symbol"] == symbol end)
+      |> Map.get("filters")
+
+    tick_size =
+      symbol_filters
+      |> Enum.find(fn x -> x["filterType"] == "PRICE_FILTER" end)
+      |> Map.get("tickSize")
+
+    step_size =
+      symbol_filters
+      |> Enum.find(fn x -> x["filterType"] == "LOT_SIZE" end)
+      |> Map.get("stepSize")
 
     %{
-      symbol: symbol,
-      chunks: 1,
-      # -0.12% for quick testing
-      profit_interval: "-0.0012",
-      tick_size: tick_size
+      tick_size: tick_size,
+      step_size: step_size
     }
   end
 
-  defp fetch_tick_size(symbol) do
-    @binance_client.get_exchange_info()
-    |> elem(1)
-    |> Map.get(:symbols)
-    |> Enum.find(&(&1["symbol"] == symbol))
-    |> Map.get("filters")
-    |> Enum.find(&(&1["filterType"] == "PRICE_FILTER"))
-    |> Map.get("tickSize")
+  defp fetch_symbol_settings(symbol) do
+    symbol_filters = fetch_symbol_filters(symbol)
+
+    Map.merge(
+      %{
+        symbol: symbol,
+        chunks: 1,
+        budget: 20,
+        buy_down_interval: "0.0001",
+        profit_interval: "-0.0012"
+      },
+      symbol_filters
+    )
   end
 
   defp fresh_trader_state(settings) do
-    struct(Trader.State, settings)
+    # struct(Trader.State, settings)
+    %{
+      struct(Trader.State, settings)
+      | budget: D.div(settings.budget, settings.chunks)
+    }
   end
 
   defp start_new_trader(%Trader.State{} = state) do

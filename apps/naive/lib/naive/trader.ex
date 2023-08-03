@@ -8,13 +8,16 @@ defmodule Naive.Trader do
 
   defmodule State do
     # This will ensure that we won’t create an invalid %State{} without those values.
-    @enforce_keys [:symbol, :profit_interval, :tick_size]
+    @enforce_keys [:symbol, :profit_interval, :tick_size, :buy_down_interval, :budget, :step_size]
     defstruct [
       :symbol,
       :buy_order,
       :sell_order,
       :profit_interval,
-      :tick_size
+      :tick_size,
+      :buy_down_interval,
+      :budget,
+      :step_size
     ]
   end
 
@@ -75,16 +78,34 @@ defmodule Naive.Trader do
   #   |> Map.get("tickSize")
   # end
 
+  def calculate_buy_price(current_price, buy_down_interval, tick_size) do
+    exact_buy_price =
+      current_price
+      |> D.mult(buy_down_interval)
+      |> D.sub(current_price)
+
+    exact_buy_price
+    |> D.div_int(tick_size)
+    |> D.mult(tick_size)
+    |> D.to_string(:normal)
+  end
+
   def handle_info(
         %TradeEvent{
           price: price
         },
         %State{
           symbol: symbol,
-          buy_order: nil
+          buy_order: nil,
+          buy_down_interval: buy_down_interval,
+          tick_size: tick_size,
+          step_size: step_size,
+          budget: budget
         } = state
       ) do
-    quantity = 100
+    price = calculate_buy_price(price, buy_down_interval, tick_size)
+    quantity = calculate_quantity(budget, price, step_size)
+
     Logger.info("Placing Buy order for #{symbol} @#{price}, quantity: #{quantity}")
 
     {:ok, %Binance.OrderResponse{} = order} =
@@ -166,6 +187,18 @@ defmodule Naive.Trader do
       D.mult(
         D.div_int(gross_target_price, tick_size),
         tick_size
+      ),
+      :normal
+    )
+  end
+
+  defp calculate_quantity(budget, price, step_size) do
+    exact_target_quantity = D.div(budget, price)
+
+    D.to_string(
+      D.mult(
+        D.div_int(exact_target_quantity, step_size),
+        step_size
       ),
       :normal
     )

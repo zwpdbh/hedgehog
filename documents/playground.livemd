@@ -1,0 +1,242 @@
+# Playground
+
+## Introduction
+
+Playground for testing hedgehog project using attached node remotely.
+
+Make sure
+
+* the `@stream_endpoint` is set to `"wss://stream.binance.us:9443/ws/"`
+  (US market and EU market's endpoint is different).
+* config for `:binance`, endpoint is `https://api.binance.us`.
+* set VPN address to EU, such as UK.
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Chatper05
+
+For [Chapter05](https://book.elixircryptobot.com/enable-parallel-trading-on-multiple-symbols.html).
+
+Visulaize the supervision tree we just start the project.
+
+```elixir
+Kino.Process.render_sup_tree(Naive.Supervisor)
+```
+
+At this point:
+
+* `Naive.Supervisor` is `Naive` application level supervisor.Its job is to start a dynamic supervisor: `Naive.DynamicSymbolSupervisor`.
+* `Naive.DynamicSymbolSupervisor` will start and supervise some process.
+
+<!-- livebook:{"break_markdown":true} -->
+
+Let's start to trade on some symbol
+
+```elixir
+Naive.start_trading("ethusdt")
+Naive.start_trading("xrpusdt")
+```
+
+Let's see the current supervision tree after start a children from `Naive.DynamicSymbolSupervisor`.
+
+```elixir
+DynamicSupervisor.which_children(Naive.DynamicSymbolSupervisor)
+|> Enum.each(fn {_, pid, _, _} = _each -> Process.info(pid) |> IO.inspect() end)
+```
+
+```elixir
+Kino.Process.render_sup_tree(Naive.Supervisor)
+```
+
+In general,
+
+* From application level's root supervisor, we start a `DynamicSupervisor` -- `Naive.DynamicSymbolSupervisor`.
+
+* `Naive.DynamicSymbolSupervisor` start children for each trading symbol.
+
+  * Each children of `Naive.DynamicSymbolSupervisor` is also a supervisor.
+  * For example, for trading symbol: "ethusdt", it will start a process: `Naive.SymbolSupervisor-ETHUSDT`.
+  * This supervisor is started as:
+    ````elixir
+        DynamicSupervisor.start_child(
+          Naive.DynamicSymbolSupervisor,
+          {Naive.SymbolSupervisor, symbol}
+        )
+        ```
+
+    - The result is invoke the `Naive.SymbolSupervisor.start_link/1` with `ETHUSDT` as the parameter.
+    - Inside `start_link`, a named supervisor is started: \
+     `Supervisor.start_link(__MODULE__, symbol, name: :"#{__MODULE__}-#{symbol}")`
+    ````
+
+* `Naive.SymbolSupervisor` then use `Supervisor` to start following pair for each symbol.
+
+  * `Naive.Leader` -- this is a `GenServer`
+  * `Naive.DynamicTraderSupervisor` -- this is a `DynamicSupervisor`
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Chapter05 (optional)
+
+### Kill temrinate a child of a supervisor
+
+After start, the terminal shows errors like:
+
+```txt
+2023-08-02 15:20:02.361 [error] GenServer :"Elixir.Naive.Leader-XRPUSDT" terminating
+** (BadMapError) expected a map, got: {:http_error, %HTTPoison.Error{reason: :timeout, id: nil}}
+    (elixir 1.14.3) lib/map.ex:534: Map.get({:http_error, %HTTPoison.Error{reason: :timeout, id: nil}}, :symbols, nil)
+    (naive 0.1.0) lib/naive/leader.ex:123: Naive.Leader.fetch_tick_size/1
+    (naive 0.1.0) lib/naive/leader.ex:109: Naive.Leader.fetch_symbol_settings/1
+    (naive 0.1.0) lib/naive/leader.ex:33: Naive.Leader.handle_continue/2
+    (stdlib 4.3) gen_server.erl:1123: :gen_server.try_dispatch/4
+    (stdlib 4.3) gen_server.erl:865: :gen_server.loop/7
+    (stdlib 4.3) proc_lib.erl:240: :proc_lib.init_p_do_apply/3
+Last message: {:continue, :start_trader}
+State: %{symbol: "XRPUSDT"}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+Is there a way to terminate just `Naive.SymbolSupervisor-XRPUSDT`? This is started by `Naive.DynamicSymbolSupervisor`. \
+So, the questions is how to terminate a certain child of a dynamic supervisor?
+
+```elixir
+DynamicSupervisor.terminate_child(
+  Naive.DynamicSymbolSupervisor,
+  Process.whereis(:"Elixir.Naive.SymbolSupervisor-ETHUSDT")
+)
+```
+
+Notice: The name of the process we want to find is `:"Elixir.Naive.SymbolSupervisor-ETHUSDT"` instead of `:"Naive.SymbolSupervisor-ETHUSDT"`
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Find a pid from a registered name
+
+Another thing to notice is when we use `Process.whereis/1`, we need to run this on the node which it is checking.
+
+```elixir
+:rpc.call(:myapp@localhost, Process, :whereis, [Naive.Supervisor])
+```
+
+Fortunately, when we are using Livebook with attached node, we execute code directly on the remote note. \
+So, simple `Process.whereis` is good enough.
+
+```elixir
+Process.whereis(Naive.Supervisor)
+```
+
+Notice if the process is registered as `:"xxx.yyy.zzz"`, we need to use it as `:"xxx.yyy.zzz"`. \
+Otherwise, we need to use it as `xxx.yyy.zzz`.
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Chapter06
+
+### Review
+
+* From Chapter05, we could see for trading one symbol. We could start multiple traders.
+* From Chapter04, we build a event system with `PubSub` at its center.
+  * A streamer use `PubSub` to broadcast to a corresponding channel.
+  * Traders subscribing to a symbol's topic from `PubSub`.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### A simple problem we want to solve
+
+* Occational, traderA's sell order could be picked up by traderB's buy order.
+* Therefore, we waste extra transaction fee for nothing (two transaction fee without any profit).
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Solution
+
+Introduce a `buy_down_interval` which will work as follow:
+
+* Instead of placing a new buy order at the current price, we place a buy order slightly lower than the current price. That is the interval between current price and the price we will buy.
+* The interval should never be smaller than double the fee we pay for transaction.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Update code
+
+* Update`Naive.Trader` 
+  * Include `buy_down_interval` into the trader's state.
+  * Calculate buy price based on:
+    * current event price.
+    * `buy_down_interval`
+    * a symbol's `tick_size`
+    * all compute using decimal precision.
+* Update `Naive.Leader` since it is managing the trader's state.
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Chapter07
+
+### Review so far
+
+* we have one trader for one symbol (defined in `chunk` from `fetch_symbol_settings/1` in `Naive.Leader`).
+* we have 100 quantity to trade for that only one trader.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Objectives
+
+A trader will be assigned with budget and its quantity will be calculated from it.
+
+* budget, the actual amount of money.
+* quantity, the number of share we could trade for a symbol
+* So, quantity is computed from 
+  * budget
+  * symbol's current price
+  * step_size, where `step_size` means "the intervals that a quantity/iceberg quantity can be increased or decreased by"
+    * Compare this with `tick_size`, the minimum change in the unit price.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Update code
+
+* `Naive.Leader`
+  * For each symbol, we need to add `step_size`.
+  * Append `budget` and `step_size` into trader's state
+* `Naive.Trader`
+  * In trader, we use `step_size` and `budget` to get the quantity.
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Tmp
+
+```elixir
+defmodule Project.Worker do
+  use GenServer
+
+  def start_link(_ignore \\ nil) do
+    GenServer.start_link(__MODULE__, nil, [])
+  end
+
+  def init(_arg) do
+    {:ok, []}
+  end
+
+  def handle_call("Hi!", _from, state) do
+    {:reply, "Hola!", state}
+  end
+end
+```
+
+```elixir
+{:ok, pid} = Project.Worker.start_link()
+```
+
+```elixir
+Process.register(pid, :"Project.Worker")
+```
+
+```elixir
+Process.whereis(Project.Worker)
+```
+
+```elixir
+Process.whereis(String.to_atom("Project.Worker"))
+```
