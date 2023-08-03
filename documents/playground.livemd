@@ -65,7 +65,7 @@ In general,
     ```
 
     * The result is invoke the `Naive.SymbolSupervisor.start_link/1` with `ETHUSDT` as the parameter.
-    * Inside `start_link`, a named supervisor is started: \
+    * Inside `start_link`, a named supervisor is started:
       `Supervisor.start_link(__MODULE__, symbol, name: :"#{__MODULE__}-#{symbol}")`
 
 * `Naive.SymbolSupervisor` then use `Supervisor` to start following pair for each symbol.
@@ -133,6 +133,10 @@ Otherwise, we need to use it as `xxx.yyy.zzz`.
 
 ## Chapter06
 
+For [chapter06](https://book.elixircryptobot.com/introduce-a-buy_down_interval-to-make-a-single-trader-more-profitable.html#introduce-a-buy_down_interval-to-make-a-single-trader-more-profitable)
+
+<!-- livebook:{"break_markdown":true} -->
+
 ### Review
 
 * From Chapter05, we could see for trading one symbol. We could start multiple traders.
@@ -168,6 +172,37 @@ Introduce a `buy_down_interval` which will work as follow:
     * a symbol's `tick_size`
     * all compute using decimal precision.
 * Update `Naive.Leader` since it is managing the trader's state.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Test
+
+* Change `config/config.exs` to make `Logger` use level `:debug` instead of `info`.
+
+```elixir
+Streamer.start_streaming("FLMUSDT")
+```
+
+```elixir
+Naive.start_trading("FLMUSDT")
+```
+
+```elixir
+Kino.Process.render_sup_tree(Naive.Supervisor)
+```
+
+```elixir
+# After mix compiel, we could load the updated module
+:code.load_file(Naive.Leader)
+```
+
+```elixir
+# If something goes wrong, we could stop the "Naive.SymbolSupervisor-xxx"
+DynamicSupervisor.terminate_child(
+  Naive.DynamicSymbolSupervisor,
+  Process.whereis(:"Elixir.Naive.SymbolSupervisor-FLMUSDT")
+)
+```
 
 <!-- livebook:{"branch_parent_index":0} -->
 

@@ -19,8 +19,8 @@ config :naive, :binance_client, BinanceMock
 
 config :logger, :console,
   # We could change log level to filter different level of log to display
-  # level: :debug,
-  level: :info,
+  level: :debug,
+  # level: :info,
   format: "$date $time [$level] $metadata$message\n"
 
 # Sample configuration:
