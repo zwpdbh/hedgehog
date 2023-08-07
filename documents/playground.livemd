@@ -180,11 +180,15 @@ Introduce a `buy_down_interval` which will work as follow:
 * Change `config/config.exs` to make `Logger` use level `:debug` instead of `info`.
 
 ```elixir
-Streamer.start_streaming("FLMUSDT")
+"ethusdt"
+|> String.upcase()
+|> Streamer.start_streaming()
 ```
 
 ```elixir
-Naive.start_trading("FLMUSDT")
+"ethusdt"
+|> String.upcase()
+|> Naive.start_trading()
 ```
 
 ```elixir
