@@ -204,7 +204,7 @@ Kino.Process.render_sup_tree(Naive.Supervisor)
 # If something goes wrong, we could stop the "Naive.SymbolSupervisor-xxx"
 DynamicSupervisor.terminate_child(
   Naive.DynamicSymbolSupervisor,
-  Process.whereis(:"Elixir.Naive.SymbolSupervisor-FLMUSDT")
+  Process.whereis(:"Elixir.Naive.SymbolSupervisor-XRPUSDT")
 )
 ```
 
