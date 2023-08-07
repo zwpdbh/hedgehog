@@ -57,7 +57,7 @@ In general,
   * Each children of `Naive.DynamicSymbolSupervisor` is also a supervisor.
   * For example, for trading symbol: "ethusdt", it will start a process: `Naive.SymbolSupervisor-ETHUSDT`.
   * This supervisor is started as:
-    ```elixir
+    ```
     DynamicSupervisor.start_child(
       Naive.DynamicSymbolSupervisor,
       {Naive.SymbolSupervisor, symbol}
