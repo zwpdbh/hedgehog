@@ -57,7 +57,7 @@ In general,
   * Each children of `Naive.DynamicSymbolSupervisor` is also a supervisor.
   * For example, for trading symbol: "ethusdt", it will start a process: `Naive.SymbolSupervisor-ETHUSDT`.
   * This supervisor is started as:
-    ```elixir
+    ```
     DynamicSupervisor.start_child(
       Naive.DynamicSymbolSupervisor,
       {Naive.SymbolSupervisor, symbol}
@@ -180,11 +180,15 @@ Introduce a `buy_down_interval` which will work as follow:
 * Change `config/config.exs` to make `Logger` use level `:debug` instead of `info`.
 
 ```elixir
-Streamer.start_streaming("FLMUSDT")
+"XRPUSDT"
+|> String.upcase()
+|> Streamer.start_streaming()
 ```
 
 ```elixir
-Naive.start_trading("FLMUSDT")
+"XRPUSDT"
+|> String.upcase()
+|> Naive.start_trading()
 ```
 
 ```elixir
@@ -200,7 +204,7 @@ Kino.Process.render_sup_tree(Naive.Supervisor)
 # If something goes wrong, we could stop the "Naive.SymbolSupervisor-xxx"
 DynamicSupervisor.terminate_child(
   Naive.DynamicSymbolSupervisor,
-  Process.whereis(:"Elixir.Naive.SymbolSupervisor-FLMUSDT")
+  Process.whereis(:"Elixir.Naive.SymbolSupervisor-XRPUSDT")
 )
 ```
 

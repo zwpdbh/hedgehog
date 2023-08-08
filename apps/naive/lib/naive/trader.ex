@@ -80,14 +80,18 @@ defmodule Naive.Trader do
 
   def calculate_buy_price(current_price, buy_down_interval, tick_size) do
     exact_buy_price =
-      current_price
-      |> D.mult(buy_down_interval)
-      |> D.sub(current_price)
+      D.sub(
+        current_price,
+        D.mult(current_price, buy_down_interval)
+      )
 
-    exact_buy_price
-    |> D.div_int(tick_size)
-    |> D.mult(tick_size)
-    |> D.to_string(:normal)
+    D.to_string(
+      D.mult(
+        D.div_int(exact_buy_price, tick_size),
+        tick_size
+      ),
+      :normal
+    )
   end
 
   def handle_info(
