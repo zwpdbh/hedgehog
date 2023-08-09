@@ -11,6 +11,7 @@ defmodule Playground do
     Streamer.start_streaming("ethusd")
     Naive.Trader.start_link(%{symbol: "ethusd", profit_interval: "0.01"})
     Naive.Trader.start_link(%{symbol: "xrpusdt", profit_interval: "0.02"})
+    :ok
   end
 
   defmodule Person do
@@ -50,5 +51,6 @@ defmodule Playground do
   def chapter_04_demo() do
     Streamer.start_streaming("ethusdt")
     Naive.Trader.start_link(%{symbol: "ETHUSDT", profit_interval: "-0.001"})
+    :ok
   end
 end

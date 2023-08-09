@@ -21,37 +21,9 @@ defmodule Naive.Trader do
     ]
   end
 
-  # Register this GenServer, usually we give it a name at this moment.
-  # The args we passed in GenServer.start_link will be used as the parameter for init.
-  # def start_link(%{} = args) do
-  #   GenServer.start_link(__MODULE__, args, name: :trader)
-  # end
-
   def start_link(%State{} = state) do
     GenServer.start_link(__MODULE__, state)
   end
-
-  # # The init's parameter is passed from GenServer.start_link
-  # def init(%{symbol: symbol, profit_interval: profit_interval}) do
-  #   symbol = String.upcase(symbol)
-  #   Logger.info("Initializing new trader for #{symbol}")
-
-  #   Phoenix.PubSub.subscribe(
-  #     Streamer.PubSub,
-  #     "TRADE_EVENTS:#{symbol}"
-  #   )
-
-  #   # After we got events from websocket stream, we fetch those symbol's tick_size.
-  #   # Tick size
-  #   tick_size = fetch_tick_size(symbol)
-
-  #   {:ok,
-  #    %State{
-  #      symbol: symbol,
-  #      profit_interval: profit_interval,
-  #      tick_size: tick_size
-  #    }}
-  # end
 
   def init(%State{symbol: symbol} = state) do
     symbol = String.upcase(symbol)
@@ -65,18 +37,6 @@ defmodule Naive.Trader do
 
     {:ok, state}
   end
-
-  # defp fetch_tick_size(symbol) do
-  #   # The result from Binance.get_exchange_info is like:
-  #   # https://github.com/binance/binance-spot-api-docs/blob/master/rest-api.md#exchange-information
-  #   @binance_client.get_exchange_info()
-  #   |> elem(1)
-  #   |> Map.get(:symbols)
-  #   |> Enum.find(&(&1["symbol"] == symbol))
-  #   |> Map.get("filters")
-  #   |> Enum.find(&(&1["filterType"] == "PRICE_FILTER"))
-  #   |> Map.get("tickSize")
-  # end
 
   def calculate_buy_price(current_price, buy_down_interval, tick_size) do
     exact_buy_price =
@@ -121,53 +81,112 @@ defmodule Naive.Trader do
     {:noreply, new_state}
   end
 
+  # Callback for dealing with buy order filled.
   def handle_info(
         %TradeEvent{
-          buyer_order_id: order_id,
-          quantity: quantity
+          buyer_order_id: order_id
+        },
+        %State{
+          buy_order: %Binance.OrderResponse{
+            # <= confirms that it's event for buy order
+            order_id: order_id,
+            # <= confirms buy order filled
+            status: "FILLED"
+          },
+          # <= confirms sell order placed
+          sell_order: %Binance.OrderResponse{}
+        } = state
+      ) do
+    # simply ignore that trade event as we know that sell event needed to be placed by previous trade event
+    {:noreply, state}
+  end
+
+  # Callback for dealing with buy order filled.
+  def handle_info(
+        %TradeEvent{
+          buyer_order_id: order_id
         },
         %State{
           symbol: symbol,
-          buy_order: %Binance.OrderResponse{
-            price: buy_price,
-            order_id: order_id,
-            orig_qty: quantity
-          },
+          buy_order:
+            %Binance.OrderResponse{
+              price: buy_price,
+              order_id: order_id,
+              orig_qty: quantity,
+              transact_time: timestamp
+            } = buy_order,
           profit_interval: profit_interval,
           tick_size: tick_size
         } = state
       ) do
-    sell_price = calculate_sell_price(buy_price, profit_interval, tick_size)
+    # fetch our buy order from Binance to check is it already filled.
+    {:ok, %Binance.Order{} = current_buy_order} =
+      @binance_client.get_order(
+        symbol,
+        timestamp,
+        order_id
+      )
 
-    Logger.info(
-      "Buy order filled, placing SELL order for " <>
-        "#{symbol} @ #{sell_price}), quantity: #{quantity}"
-    )
+    buy_order = %{buy_order | status: current_buy_order.status}
 
-    {:ok, %Binance.OrderResponse{} = order} =
-      @binance_client.order_limit_sell(symbol, quantity, sell_price, "GTC")
+    {:ok, new_state} =
+      case buy_order.status do
+        "FILLED" ->
+          sell_price = calculate_sell_price(buy_price, profit_interval, tick_size)
 
-    new_state = %{state | sell_order: order}
+          Logger.info(
+            "Buy order filled, placing SELL order for " <>
+              "#{symbol} @ #{sell_price}), quantity: #{quantity}"
+          )
+
+          {:ok, %Binance.OrderResponse{} = order} =
+            @binance_client.order_limit_sell(symbol, quantity, sell_price, "GTC")
+
+          {:ok, %{state | sell_order: order, buy_order: buy_order}}
+
+        _ ->
+          Logger.info("Buy order partially filled")
+          {:ok, %{state | buy_order: buy_order}}
+      end
+
     Naive.Leader.notify(:trader_state_updated, new_state)
 
     {:noreply, new_state}
   end
 
+  # Callback for dealing with sell_order
   def handle_info(
         %TradeEvent{
-          seller_order_id: order_id,
-          quantity: quantity
+          seller_order_id: order_id
         },
         %State{
-          sell_order: %Binance.OrderResponse{
-            order_id: order_id,
-            orig_qty: quantity
-          }
+          symbol: symbol,
+          sell_order:
+            %Binance.OrderResponse{
+              order_id: order_id,
+              transact_time: timestamp
+            } = sell_order
         } = state
       ) do
-    Logger.info("Trade finished, trader will now exit")
-    # a tuple with :stop atom which will cause the trader process to terminate.
-    {:stop, :normal, state}
+    {:ok, %Binance.Order{} = current_sell_order} =
+      @binance_client.get_order(
+        symbol,
+        timestamp,
+        order_id
+      )
+
+    sell_order = %{sell_order | status: current_sell_order.status}
+
+    if sell_order.status == "FILLED" do
+      Logger.info("Trade finished, trader will now exit")
+      {:stop, :normal, state}
+    else
+      Logger.info("Sell order partially filled")
+      new_state = %{state | sell_order: sell_order}
+      Naive.Leader.notify(:trader_state_updated, new_state)
+      {:noreply, new_state}
+    end
+
   end
 
   def handle_info(%TradeEvent{}, state) do

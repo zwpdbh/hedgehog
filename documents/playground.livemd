@@ -57,16 +57,18 @@ In general,
   * Each children of `Naive.DynamicSymbolSupervisor` is also a supervisor.
   * For example, for trading symbol: "ethusdt", it will start a process: `Naive.SymbolSupervisor-ETHUSDT`.
   * This supervisor is started as:
-    ```
-    DynamicSupervisor.start_child(
-      Naive.DynamicSymbolSupervisor,
-      {Naive.SymbolSupervisor, symbol}
-    )
-    ```
+    `````
+            DynamicSupervisor.start_child(
+              Naive.DynamicSymbolSupervisor,
+              {Naive.SymbolSupervisor, symbol}
+            )
+            ```
 
-    * The result is invoke the `Naive.SymbolSupervisor.start_link/1` with `ETHUSDT` as the parameter.
-    * Inside `start_link`, a named supervisor is started:
-      `Supervisor.start_link(__MODULE__, symbol, name: :"#{__MODULE__}-#{symbol}")`
+        * The result is invoke the `Naive.SymbolSupervisor.start_link/1` with `ETHUSDT` as the parameter.
+        * Inside `start_link`, a named supervisor is started:
+          `Supervisor.start_link(__MODULE__, symbol, name: :"#{__MODULE__}-#{symbol}")`
+        ````
+    `````
 
 * `Naive.SymbolSupervisor` then use `Supervisor` to start following pair for each symbol.
 
@@ -214,6 +216,8 @@ DynamicSupervisor.terminate_child(
 
 ### Review so far
 
+(For [Chapter07](https://book.elixircryptobot.com/introduce-a-trader-budget-and-calculating-the-quantity.html))
+
 * we have one trader for one symbol (defined in `chunk` from `fetch_symbol_settings/1` in `Naive.Leader`).
 * we have 100 quantity to trade for that only one trader.
 
@@ -240,6 +244,36 @@ A trader will be assigned with budget and its quantity will be calculated from i
   * Append `budget` and `step_size` into trader's state
 * `Naive.Trader`
   * In trader, we use `step_size` and `budget` to get the quantity.
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Chapter08
+
+For [Chapter08](https://book.elixircryptobot.com/add-support-for-multiple-transactions-per-order.html)
+
+### Review so far
+
+#### The potential data race problem
+
+Sometimes our order will be filled by two or more transactions:
+The easiest and the safest way to check has this event filled our order fully is to fetch our order again from Binance at the moment when trade event filling our order arrives.
+
+The problem with this approach is that sometimes we will run into a race condition:
+
+The easiest and the safest way to check has this event filled our order fully is to fetch our order again from Binance at the moment when trade event filling our order arrives.
+
+The problem with this approach is that sometimes we will run into a race condition:
+
+#### Solution
+
+What we need to do is to update the status of the buy order after the first fetch(if it’s filled) so when the second trade event arrives we will ignore it(this will require an additional callback).
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Modifications
+
+* Modify the callback which monitors incoming trade events for ones filling its buy order and then places sell order.
+  * modify the callback which monitors incoming trade events for ones filling its buy order and then places sell order.
 
 <!-- livebook:{"branch_parent_index":0} -->
 
