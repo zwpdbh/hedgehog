@@ -55,20 +55,20 @@ In general,
 * `Naive.DynamicSymbolSupervisor` start children for each trading symbol.
 
   * Each children of `Naive.DynamicSymbolSupervisor` is also a supervisor.
-  * For example, for trading symbol: "ethusdt", it will start a process: `Naive.SymbolSupervisor-ETHUSDT`.
-  * This supervisor is started as:
-    `````
-            DynamicSupervisor.start_child(
-              Naive.DynamicSymbolSupervisor,
-              {Naive.SymbolSupervisor, symbol}
-            )
-            ```
 
-        * The result is invoke the `Naive.SymbolSupervisor.start_link/1` with `ETHUSDT` as the parameter.
-        * Inside `start_link`, a named supervisor is started:
-          `Supervisor.start_link(__MODULE__, symbol, name: :"#{__MODULE__}-#{symbol}")`
-        ````
-    `````
+  * For example, for trading symbol: "ethusdt", it will start a process: `Naive.SymbolSupervisor-ETHUSDT`.
+
+  * This supervisor is started as
+
+    * The result is invoke the `Naive.SymbolSupervisor.start_link/1` with `ETHUSDT` as the parameter.
+    * Inside `start_link`, a named supervisor is started: `Supervisor.start_link(__MODULE__, symbol, name: :"#{__MODULE__}-#{symbol}")`.
+
+    ```elixir
+    DynamicSupervisor.start_child(
+      Naive.DynamicSymbolSupervisor,
+      {Naive.SymbolSupervisor, symbol}
+    )
+    ```
 
 * `Naive.SymbolSupervisor` then use `Supervisor` to start following pair for each symbol.
 
