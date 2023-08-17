@@ -277,6 +277,334 @@ What we need to do is to update the status of the buy order after the first fetc
 
 <!-- livebook:{"branch_parent_index":0} -->
 
+## Chapter09
+
+From [chapter09](https://book.elixircryptobot.com/run-multiple-traders-in-parallel.html)
+
+The goal is to solve the following problem:\
+Currently we start multiple traders at the same time when we start to trade for one symbol, what we want to achieve is start one trader, then start the second one when the price goes down for some degree, call it `rebuy_interval`.  If the price continue goes down, we start the third one, so on and so forth.
+
+By doing this, we could achieve a lot more profit as the price goes in some "V" shape.
+
+The code we need to change include:
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Trader
+
+* add `rebuy_interval` and `rebuy_noticed` in trader state.
+
+  The `rebuy_noticed` is included because the rebuy signal must be sent from some trader. Because some trader receive the trading events and decide if the price has goes down enough since its buy order filled.
+
+* add `id` to distinguish each trader from each other.
+
+* Rebuy logic should be placed almost as the last callback just before the one that ignores all events.
+
+  * Sent to `Leader` using `GenServer.call` with protocol `{:rebuy_triggered, trader_state}`.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Leader
+
+* Modify how we start traders, now we still start a list of traders but the number of trader is one.
+* Handle call event sent from some trader: 
+  * we need the trader's PID to be able to find it details inside the list of traders
+  * we need settings to confirm the number of chunks to be able to limit the maximum number of parallel traders.
+
+<!-- livebook:{"branch_parent_index":0} -->
+
+## Chapter10
+
+From [chapter10](https://book.elixircryptobot.com/fine-tune-trading-strategy-per-symbol.html)
+
+So far each symbol's setting is hard coded into the elixir code. We want to use different settings for different symbols.
+
+We introduce data persistense now and will save settings into Postgres database.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Add Postgres to project as docker-compose services
+
+Create a `docker-compose.yml` file and fill it with
+
+```yaml
+# /docker-compose.yml
+version: "3.2"
+services:
+  db:
+    image: postgres:latest
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: "postgres"
+    ports:
+      - 5432:5432
+    volumes:
+      - ../postgres-data:/var/lib/postgresql/data
+```
+
+start the services by:
+
+```sh
+docker-compose up -d
+Creating network "hedgehog_default" with the default driver
+Creating hedgehog_db_1 ... done
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Setup `ecto` inside `naive` app
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### Prepare dependencies
+
+First, add dependencies to `naive` app
+
+* `ecto_sql`, [provides functionality for working with SQL databases in Ecto](https://hexdocs.pm/ecto_sql/Ecto.Adapters.SQL.html)
+  * One of its supported adapter is `Ecto.Adapters.Postgres` which uses `Postgrex` for communicating to the database.
+* `ecto_enum`, [used whenever you want to keep atom values in a field](https://hexdocs.pm/ecto/Ecto.Enum.html)
+* `postgrex`, PostgreSQL driver for Elixir.
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### Add ecto repo to application
+
+After modify `/apps/naive/mix.exs` and run `mix deps.get`, we need to add the ecto repo to the application.
+
+```sh
+$ cd apps/naive
+$ mix ecto.gen.repo -r Naive.Repo
+* creating lib/naive
+* creating lib/naive/repo.ex
+* updating ../../config/config.ex
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### Config ecto repo in application
+
+* Add `Naive.Repo` into application's supervision tree.
+* Update `/config/config.exs` to speicfy the ecto repo and how to connect to it.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+# Specify the ecto repos used for :naive application.  
+config :naive,
+  ecto_repos: [Naive.Repo]
+
+# Specify how to connect to ecto repo "Naive.Repo" for :naive application.
+config :naive, Naive.Repo,
+  database: "naive_repo",
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost"
+```
+
+`Naive.Repo` will be the name we use across Elixir application to represent database `naive_repo`.
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### Setup supervision tree for DB connection.
+
+The last step is to create database connection when application is started, we need to add `Naive.Repo` into the list of `Naive.Application`.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+# /apps/naive/lib/naive/application.ex
+def start(_type, _args) do
+  children = [
+    {Naive.Repo, []}, # <= added line
+    {
+      DynamicSupervisor,
+      strategy: :one_for_one, name: Naive.DynamicSymbolSupervisor
+    }
+  ]
+  #...
+```
+
+Notice the order children matters.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Create and migrate the DB
+
+All the above steps just defines the DB and how to talk to it in Elixir application. 
+In this part, we will
+
+* create the database
+* create the table by migration
+* create schema to the table
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### create database
+
+```sh
+mix ecto.create -r Naive.Repo
+The database for Naive.Repo has been created
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### create table migration
+
+Tables are created by
+
+* define migration
+* run migration
+
+```
+zw@zwpdbh:~/code/elixir_programming/hedgehog$ cd apps/naive/
+zw@zwpdbh:~/code/elixir_programming/hedgehog/apps/naive$ mix ecto.gen.migration create_settings
+* creating priv/repo/migrations
+* creating priv/repo/migrations/20230817072601_create_settings.exs
+```
+
+**Notice** we need to switch to `naive` application's directory to run `ecto.gen.migration`.
+
+<!-- livebook:{"break_markdown":true} -->
+
+By editing the generated `priv/repo/migrations/xxx.exs` migration file, we could create or update database table.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+defmodule Naive.Repo.Migrations.CreateSettings do
+  use Ecto.Migration
+
+  alias Naive.Schema.TradingStatusEnum
+
+  def change do
+     TradingStatusEnum.create_type()
+
+     create table(:settings, primary_key: false) do
+      add(:id, :uuid, primary_key: true)
+      add(:symbol, :text, null: false)
+      add(:chunks, :integer, null: false)
+      add(:budget, :decimal, null: false)
+      add(:buy_down_interval, :decimal, null: false)
+      add(:profit_interval, :decimal, null: false)
+      add(:rebuy_interval, :decimal, null: false)
+      add(:status, TradingStatusEnum.type(), default: "off", null: false)
+
+      timestamps()
+    end
+
+    create(unique_index(:settings, [:symbol]))
+  end
+end
+```
+
+**Notice**
+
+* Use `uuid` for `id`
+* Use `timestamps`
+* Create unique index for `symbol` column.
+* Use enum type for `status` column.
+
+The `Naive.Schema.TradingStatusEnum` module is created as
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+import EctoEnum
+defenum(Naive.Schema.TradingStatusEnum, :trading_status, [:on, :off])
+```
+
+After this migration is defined, execute the migration by
+
+```sh
+zw@zwpdbh:~/code/elixir_programming/hedgehog/apps/naive$ mix ecto.migrate
+Compiling 1 file (.ex)
+Generated naive app
+
+15:50:57.081 [info] == Running 20230817072601 Naive.Repo.Migrations.CreateSettings.change/0 forward
+
+15:50:57.086 [info] execute "CREATE TYPE public.trading_status AS ENUM ('on', 'off')"
+
+15:50:57.087 [info] create table settings
+
+15:50:57.095 [info] create index settings_symbol_index
+
+15:50:57.099 [info] == Migrated 20230817072601 in 0.0s
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### Create schema for table
+
+The last step to use data from database table is to define the scehma for it.\
+Create the `/apps/naive/lib/naive/schema/settings.ex`
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+defmodule Naive.Schema.Settings do
+  use Ecto.Schema
+
+  alias Naive.Schema.TradingStatusEnum
+
+  @primary_key {:id, :binary_id, autogenerate: true}
+
+  schema "settings" do
+    field(:symbol, :string)
+    field(:chunks, :integer)
+    field(:budget, :decimal)
+    field(:buy_down_interval, :decimal)
+    field(:profit_interval, :decimal)
+    field(:rebuy_interval, :decimal)
+    field(:status, TradingStatusEnum)
+
+    timestamps()
+  end
+end
+```
+
+An "Ecto schema" refers to a module that defines the structure of a database table and its associated fields.\
+It defines how we interact with data of a table in Elixir code.
+Such as how to query or update records of table in database.
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### Seed symbol's settings
+
+After we have created the DB, created table by migration and defined our schema. It is time to generate some settings for each symbol.
+
+* Define default settings inside `config/config.exs`
+* Create a seed script that will fetch all pairs from Binance and insert a new config row inside DB for each symbol.
+
+<!-- livebook:{"break_markdown":true} -->
+
+Place the following setting into `config/config.exs` for `config :naive`:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+trading: %{
+    defaults: %{
+      chunks: 5,
+      budget: 1000,
+      buy_down_interval: "0.0001",
+      profit_interval: "-0.0012",
+      rebuy_interval: "0.001"
+    }
+  }
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+The seed script for `naive` app is `apps/naive/priv/seed_settings.exs`
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Update `Naive.Leader` to fetch settings
+
+We need to mofiy the `fetch_symbol_settings/1` to fetch settings from DB instead of the hardcoded map.
+
+<!-- livebook:{"branch_parent_index":0} -->
+
 ## Tmp
 
 ```elixir
