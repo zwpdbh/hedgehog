@@ -352,6 +352,41 @@ Creating hedgehog_db_1 ... done
 
 <!-- livebook:{"break_markdown":true} -->
 
+Notice: this will create a directory for data persistence at the parent level from where you execute the `docker-compose up -d` command.
+
+```sh
+zw@zwpdbh:~/code/elixir_programming$ sudo ls postgres-data/ -la
+total 136
+drwx------ 19 999 root  4096 Aug 17 14:34 .
+drwxr-xr-x 12 zw  zw    4096 Aug  9 16:01 ..
+-rw-------  1 999  999     3 Aug  9 16:01 PG_VERSION
+drwx------  7 999  999  4096 Aug 17 15:21 base
+drwx------  2 999  999  4096 Aug 17 15:50 global
+drwx------  2 999  999  4096 Aug  9 16:01 pg_commit_ts
+drwx------  2 999  999  4096 Aug  9 16:01 pg_dynshmem
+-rw-------  1 999  999  4821 Aug  9 16:01 pg_hba.conf
+-rw-------  1 999  999  1636 Aug  9 16:01 pg_ident.conf
+drwx------  4 999  999  4096 Aug 23 17:06 pg_logical
+drwx------  4 999  999  4096 Aug  9 16:01 pg_multixact
+drwx------  2 999  999  4096 Aug  9 16:01 pg_notify
+drwx------  2 999  999  4096 Aug  9 16:01 pg_replslot
+drwx------  2 999  999  4096 Aug  9 16:01 pg_serial
+drwx------  2 999  999  4096 Aug  9 16:01 pg_snapshots
+drwx------  2 999  999  4096 Aug 17 14:34 pg_stat
+drwx------  2 999  999  4096 Aug  9 16:01 pg_stat_tmp
+drwx------  2 999  999  4096 Aug  9 16:01 pg_subtrans
+drwx------  2 999  999  4096 Aug  9 16:01 pg_tblspc
+drwx------  2 999  999  4096 Aug  9 16:01 pg_twophase
+drwx------  3 999  999  4096 Aug 17 15:25 pg_wal
+drwx------  2 999  999  4096 Aug  9 16:01 pg_xact
+-rw-------  1 999  999    88 Aug  9 16:01 postgresql.auto.conf
+-rw-------  1 999  999 29525 Aug  9 16:01 postgresql.conf
+-rw-------  1 999  999    36 Aug 17 14:34 postmaster.opts
+-rw-------  1 999  999    94 Aug 17 14:34 postmaster.pid
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
 ### Setup `ecto` inside `naive` app
 
 <!-- livebook:{"break_markdown":true} -->
