@@ -595,7 +595,16 @@ trading: %{
 
 <!-- livebook:{"break_markdown":true} -->
 
-The seed script for `naive` app is `apps/naive/priv/seed_settings.exs`
+The seed script for `naive` app is `apps/naive/priv/seed_settings.exs`. Run it using `mix` within the application directory.
+
+```
+$ cd apps/naive/
+$ mix run priv/seed_settings.exs 
+2023-08-23 17:04:18.306 [info] Fetching exchange info from Binance to create trading settings
+2023-08-23 17:04:19.979 [info] Inserting default settings for symbols
+...
+2023-08-23 17:04:20.032 [info] Inserted settings for 536 symbols
+```
 
 <!-- livebook:{"break_markdown":true} -->
 
