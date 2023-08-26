@@ -9,13 +9,30 @@
 # move said applications out of the umbrella.
 import Config
 
+config :naive, Naive.Repo,
+  database: "naive_repo",
+  username: "postgres",
+  password: "postgres",
+  hostname: "localhost"
+
 config :binance,
   api_key: "xxx",
   secret_key: "xxx",
   # Add for the US API end point. The default is for "https://api.binance.com"
   end_point: "https://api.binance.us"
 
-config :naive, :binance_client, BinanceMock
+config :naive,
+  ecto_repos: [Naive.Repo],
+  binance_client: BinanceMock,
+  trading: %{
+    defaults: %{
+      chunks: 5,
+      budget: 1000,
+      buy_down_interval: "0.0001",
+      profit_interval: "-0.0012",
+      rebuy_interval: "0.001"
+    }
+  }
 
 config :logger, :console,
   # We could change log level to filter different level of log to display

@@ -34,7 +34,10 @@ defmodule Naive.MixProject do
       {:decimal, "~> 2.0"},
       {:streamer, in_umbrella: true},
       {:phoenix_pubsub, "~> 2.0"},
-      {:binance_mock, in_umbrella: true}
+      {:binance_mock, in_umbrella: true},
+      {:ecto_sql, "~> 3.0"},
+      {:ecto_enum, "~> 1.4"},
+      {:postgrex, ">= 0.0.0"}
     ]
   end
 end
